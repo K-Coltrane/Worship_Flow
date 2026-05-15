@@ -19,7 +19,7 @@ export function KeyboardHints() {
     <>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-4 right-4 p-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-full shadow-lg border border-zinc-700 transition-colors z-50"
+        className="fixed bottom-16 right-4 p-3 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-full shadow-lg border border-border transition-colors z-50"
         title="Keyboard Shortcuts"
       >
         <Keyboard size={20} />
@@ -39,35 +39,36 @@ export function KeyboardHints() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 w-96 max-w-[90vw]"
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-card border border-border rounded-xl shadow-2xl z-50 w-96 max-w-[90vw]"
             >
-              <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+              <div className="p-4 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Keyboard size={20} className="text-blue-400" />
-                  <h3 className="text-white font-semibold">Keyboard Shortcuts</h3>
+                  <Keyboard size={20} className="text-blue-600 dark:text-blue-400" />
+                  <h3 className="text-foreground font-semibold">Keyboard Shortcuts</h3>
                 </div>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="p-1 hover:bg-zinc-800 rounded transition-colors"
+                  className="p-1 hover:bg-muted rounded transition-colors"
                 >
-                  <X size={18} className="text-zinc-400" />
+                  <X size={18} className="text-muted-foreground" />
                 </button>
               </div>
               <div className="p-4 space-y-2">
                 {shortcuts.map((shortcut, i) => (
                   <div
                     key={i}
-                    className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-lg"
+                    className="flex items-center justify-between p-3 bg-muted/60 rounded-lg"
                   >
-                    <span className="text-zinc-300">{shortcut.action}</span>
-                    <kbd className="px-3 py-1.5 bg-zinc-950 border border-zinc-700 rounded text-sm font-mono text-white">
+                    <span className="text-foreground">{shortcut.action}</span>
+                    <kbd className="px-3 py-1.5 bg-background border border-border rounded text-sm font-mono text-foreground">
                       {shortcut.key}
                     </kbd>
                   </div>
                 ))}
               </div>
-              <div className="p-4 border-t border-zinc-800 text-center text-zinc-500 text-sm">
-                Press <kbd className="px-2 py-1 bg-zinc-800 rounded text-xs">?</kbd> anytime to toggle this menu
+              <div className="p-4 border-t border-border text-center text-muted-foreground text-sm">
+                Press <kbd className="px-2 py-1 bg-muted rounded text-xs text-foreground">?</kbd>{' '}
+                anytime to toggle this menu
               </div>
             </motion.div>
           </>

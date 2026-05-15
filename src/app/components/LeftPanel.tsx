@@ -81,8 +81,8 @@ export function LeftPanel({ onItemSelect, onItemDoubleClick }: LeftPanelProps) {
   };
 
   return (
-    <div className="w-80 bg-zinc-900 border-r border-zinc-800 flex flex-col">
-      <div className="border-b border-zinc-800">
+    <div className="w-80 bg-card border-r border-border flex flex-col min-h-0">
+      <div className="border-b border-border shrink-0">
         <div className="flex">
           {tabs.map(tab => {
             const Icon = tab.icon;
@@ -92,8 +92,8 @@ export function LeftPanel({ onItemSelect, onItemDoubleClick }: LeftPanelProps) {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex-1 py-3 px-4 flex items-center justify-center gap-2 transition-colors ${
                   activeTab === tab.id
-                    ? 'bg-zinc-800 text-blue-400 border-b-2 border-blue-500'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+                    ? 'bg-muted text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
                 }`}
               >
                 <Icon size={18} />
@@ -104,55 +104,55 @@ export function LeftPanel({ onItemSelect, onItemDoubleClick }: LeftPanelProps) {
         </div>
       </div>
 
-      <div className="p-3 border-b border-zinc-800">
+      <div className="p-3 border-b border-border shrink-0">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
           <input
             type="text"
             placeholder={`Search ${activeTab}...`}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-2 bg-muted border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
             autoFocus
           />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0">
         {getFilteredItems().map((item: any) => (
           <div
             key={item.id}
             onClick={() => onItemSelect(item, activeTab)}
             onDoubleClick={() => onItemDoubleClick(item, activeTab)}
-            className="p-3 hover:bg-zinc-800 cursor-pointer border-b border-zinc-800/50 group transition-colors"
+            className="p-3 hover:bg-muted cursor-pointer border-b border-border/60 group transition-colors"
           >
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 {activeTab === 'songs' && (
                   <>
-                    <div className="text-white font-medium truncate">{item.title}</div>
-                    <div className="text-zinc-400 text-sm truncate">{item.artist}</div>
+                    <div className="text-foreground font-medium truncate">{item.title}</div>
+                    <div className="text-muted-foreground text-sm truncate">{item.artist}</div>
                   </>
                 )}
                 {activeTab === 'scriptures' && (
                   <>
-                    <div className="text-white font-medium">{item.reference}</div>
-                    <div className="text-zinc-400 text-sm">{item.version}</div>
+                    <div className="text-foreground font-medium">{item.reference}</div>
+                    <div className="text-muted-foreground text-sm">{item.version}</div>
                   </>
                 )}
                 {activeTab === 'media' && (
                   <>
-                    <div className="text-white font-medium truncate">{item.name}</div>
-                    <div className="text-zinc-400 text-sm">{item.type}</div>
+                    <div className="text-foreground font-medium truncate">{item.name}</div>
+                    <div className="text-muted-foreground text-sm">{item.type}</div>
                   </>
                 )}
               </div>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
-                <button className="p-1 hover:bg-zinc-700 rounded">
-                  <Edit size={14} className="text-zinc-400" />
+                <button className="p-1 hover:bg-secondary rounded">
+                  <Edit size={14} className="text-muted-foreground" />
                 </button>
-                <button className="p-1 hover:bg-zinc-700 rounded">
-                  <Trash2 size={14} className="text-zinc-400" />
+                <button className="p-1 hover:bg-secondary rounded">
+                  <Trash2 size={14} className="text-muted-foreground" />
                 </button>
               </div>
             </div>
@@ -160,7 +160,7 @@ export function LeftPanel({ onItemSelect, onItemDoubleClick }: LeftPanelProps) {
         ))}
       </div>
 
-      <div className="p-3 border-t border-zinc-800">
+      <div className="p-3 border-t border-border shrink-0">
         <button className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2">
           <Plus size={18} />
           Add New {activeTab.slice(0, -1)}

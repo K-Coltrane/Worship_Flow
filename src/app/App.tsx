@@ -167,7 +167,7 @@ export default function App() {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="dark size-full flex flex-col bg-black overflow-hidden">
+      <div className="h-full w-full min-h-0 max-h-full flex flex-col bg-background text-foreground overflow-hidden">
         <TopBar
           onNext={handleNext}
           onPrevious={handlePrevious}
@@ -179,7 +179,7 @@ export default function App() {
           isMicActive={isMicActive}
         />
 
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
           <LeftPanel
             onItemSelect={handleItemSelect}
             onItemDoubleClick={handleItemDoubleClickFromLibrary}
