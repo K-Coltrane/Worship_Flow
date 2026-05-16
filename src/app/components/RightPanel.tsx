@@ -1,45 +1,22 @@
-import { useState, useEffect } from 'react';
 import { ChevronRight, BookOpen, Mic } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-
-interface DetectedScripture {
-  id: string;
-  reference: string;
-  timestamp: string;
-  confidence: number;
-}
+import { DetectedScripture } from '../lib/backend';
 
 interface RightPanelProps {
   isOpen: boolean;
   isMicActive: boolean;
+  transcriptLines: string[];
+  detectedScriptures: DetectedScripture[];
   onScriptureToPreview: (scripture: DetectedScripture) => void;
 }
 
-const mockTranscription = [
-  'And the Lord says in John chapter 3 verse 16...',
-  'For God so loved the world that he gave his one and only Son...',
-  'Turn with me to Psalm 23...',
-  'The Lord is my shepherd, I shall not want...',
-  'As it says in Romans 8:28...',
-];
-
-export function RightPanel({ isOpen, isMicActive, onScriptureToPreview }: RightPanelProps) {
-  const [transcriptLines, setTranscriptLines] = useState<string[]>([]);
-  const [detectedScriptures] = useState<DetectedScripture[]>([
-    { id: '1', reference: 'John 3:16', timestamp: '10:23 AM', confidence: 0.95 },
-    { id: '2', reference: 'Psalm 23:1-6', timestamp: '10:24 AM', confidence: 0.92 },
-    { id: '3', reference: 'Romans 8:28', timestamp: '10:26 AM', confidence: 0.88 },
-  ]);
-
-  useEffect(() => {
-    if (isMicActive && transcriptLines.length < mockTranscription.length) {
-      const timer = setTimeout(() => {
-        setTranscriptLines((prev) => [...prev, mockTranscription[prev.length]]);
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [isMicActive, transcriptLines.length]);
-
+export function RightPanel({
+  isOpen,
+  isMicActive,
+  transcriptLines,
+  detectedScriptures,
+  onScriptureToPreview,
+}: RightPanelProps) {
   return (
     <AnimatePresence>
       {isOpen && (

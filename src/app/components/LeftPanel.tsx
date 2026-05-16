@@ -1,42 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, Music, BookOpen, Image, Plus, Edit, Trash2 } from 'lucide-react';
+import { backendApi, ScriptureLibraryItem, Song } from '../lib/backend';
 
 type TabType = 'songs' | 'scriptures' | 'media';
-
-interface Song {
-  id: string;
-  title: string;
-  artist: string;
-}
-
-interface Scripture {
-  id: string;
-  reference: string;
-  version: string;
-}
 
 interface Media {
   id: string;
   name: string;
   type: string;
 }
-
-const mockSongs: Song[] = [
-  { id: '1', title: 'Amazing Grace', artist: 'Traditional' },
-  { id: '2', title: 'How Great Thou Art', artist: 'Traditional' },
-  { id: '3', title: 'Holy Holy Holy', artist: 'Reginald Heber' },
-  { id: '4', title: 'Great is Thy Faithfulness', artist: 'Thomas Chisholm' },
-  { id: '5', title: 'It is Well', artist: 'Horatio Spafford' },
-  { id: '6', title: 'Blessed Assurance', artist: 'Fanny Crosby' },
-];
-
-const mockScriptures: Scripture[] = [
-  { id: '1', reference: 'John 3:16', version: 'NIV' },
-  { id: '2', reference: 'Psalm 23:1-6', version: 'NIV' },
-  { id: '3', reference: 'Romans 8:28', version: 'ESV' },
-  { id: '4', reference: '1 Corinthians 13:4-8', version: 'NIV' },
-  { id: '5', reference: 'Philippians 4:13', version: 'NIV' },
-];
 
 const mockMedia: Media[] = [
   { id: '1', name: 'Worship Background.mp4', type: 'video' },
@@ -52,6 +24,52 @@ interface LeftPanelProps {
 export function LeftPanel({ onItemSelect, onItemDoubleClick }: LeftPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>('songs');
   const [searchQuery, setSearchQuery] = useState('');
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [scriptures, setScriptures] = useState<ScriptureLibraryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLibrary() {
+      if (activeTab === 'media') {
+        return;
+      }
+
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        if (activeTab === 'songs') {
+          const results = await backendApi.searchSongs(searchQuery);
+          if (!cancelled) {
+            setSongs(results);
+          }
+        } else {
+          const results = await backendApi.searchScriptures(searchQuery);
+          if (!cancelled) {
+            setScriptures(results);
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError('Backend library unavailable');
+          console.error(error);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    const timer = window.setTimeout(loadLibrary, 150);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [activeTab, searchQuery]);
 
   const tabs = [
     { id: 'songs' as TabType, label: 'Songs', icon: Music },
@@ -63,12 +81,12 @@ export function LeftPanel({ onItemSelect, onItemDoubleClick }: LeftPanelProps) {
     const query = searchQuery.toLowerCase();
     switch (activeTab) {
       case 'songs':
-        return mockSongs.filter(song =>
+        return songs.filter(song =>
           song.title.toLowerCase().includes(query) ||
-          song.artist.toLowerCase().includes(query)
+          (song.artist ?? '').toLowerCase().includes(query)
         );
       case 'scriptures':
-        return mockScriptures.filter(scripture =>
+        return scriptures.filter(scripture =>
           scripture.reference.toLowerCase().includes(query)
         );
       case 'media':
@@ -119,6 +137,12 @@ export function LeftPanel({ onItemSelect, onItemDoubleClick }: LeftPanelProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto min-h-0">
+        {isLoading && (
+          <div className="p-3 text-muted-foreground text-sm">Loading {activeTab}...</div>
+        )}
+        {loadError && (
+          <div className="p-3 text-red-600 dark:text-red-400 text-sm">{loadError}</div>
+        )}
         {getFilteredItems().map((item: any) => (
           <div
             key={item.id}
@@ -131,13 +155,13 @@ export function LeftPanel({ onItemSelect, onItemDoubleClick }: LeftPanelProps) {
                 {activeTab === 'songs' && (
                   <>
                     <div className="text-foreground font-medium truncate">{item.title}</div>
-                    <div className="text-muted-foreground text-sm truncate">{item.artist}</div>
+                    <div className="text-muted-foreground text-sm truncate">{item.artist || 'Unknown artist'}</div>
                   </>
                 )}
                 {activeTab === 'scriptures' && (
                   <>
                     <div className="text-foreground font-medium">{item.reference}</div>
-                    <div className="text-muted-foreground text-sm">{item.version}</div>
+                    <div className="text-muted-foreground text-sm truncate">{item.version} • {item.text}</div>
                   </>
                 )}
                 {activeTab === 'media' && (

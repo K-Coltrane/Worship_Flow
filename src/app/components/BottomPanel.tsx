@@ -1,31 +1,25 @@
 import { useState } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { Music, BookOpen, Image as ImageIcon, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
-
-interface ServiceItem {
-  id: string;
-  type: 'song' | 'scripture' | 'media';
-  title: string;
-  subtitle?: string;
-}
+import { ServiceFlowItem } from '../lib/backend';
 
 interface BottomPanelProps {
-  serviceItems: ServiceItem[];
+  serviceItems: ServiceFlowItem[];
   previewItemId: string | null;
   liveItemId: string | null;
   onReorder: (dragIndex: number, hoverIndex: number) => void;
-  onItemClick: (item: ServiceItem) => void;
-  onItemDoubleClick: (item: ServiceItem) => void;
+  onItemClick: (item: ServiceFlowItem) => void;
+  onItemDoubleClick: (item: ServiceFlowItem) => void;
 }
 
 interface DraggableItemProps {
-  item: ServiceItem;
+  item: ServiceFlowItem;
   index: number;
   isPreview: boolean;
   isLive: boolean;
   onReorder: (dragIndex: number, hoverIndex: number) => void;
-  onItemClick: (item: ServiceItem) => void;
-  onItemDoubleClick: (item: ServiceItem) => void;
+  onItemClick: (item: ServiceFlowItem) => void;
+  onItemDoubleClick: (item: ServiceFlowItem) => void;
 }
 
 function DraggableServiceItem({ item, index, isPreview, isLive, onReorder, onItemClick, onItemDoubleClick }: DraggableItemProps) {

@@ -1,4 +1,5 @@
 import { Controller, Get, ParseIntPipe, Query } from '@nestjs/common';
+import { detectScriptureReferences } from './scripture-reference.parser';
 import { ScriptureService } from './scripture.service';
 
 @Controller('scripture')
@@ -18,6 +19,19 @@ export class ScriptureController {
   @Get('search')
   searchScripture(@Query('q') query: string, @Query('translation') translation?: string) {
     return this.scriptureService.searchScripture(query ?? '', translation);
+  }
+
+  @Get('passage')
+  getPassage(@Query('reference') reference: string, @Query('translation') translation?: string) {
+    const parsedReference = detectScriptureReferences(reference ?? '')[0];
+    return this.scriptureService.buildPresentationContent(
+      parsedReference ?? {
+        reference,
+        book: reference,
+        chapter: 1,
+      },
+      translation,
+    );
   }
 
   @Get('detect')

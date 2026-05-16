@@ -83,7 +83,14 @@ export class ScriptureService {
   searchScripture(query: string, translation = 'KJV'): ScriptureVerse[] {
     const normalized = query.trim();
     if (!normalized) {
-      return [];
+      return this.database.db
+        .prepare(
+          `SELECT * FROM scriptures
+           WHERE translation = ?
+           ORDER BY book ASC, chapter ASC, verse ASC
+           LIMIT 50`,
+        )
+        .all(translation) as ScriptureRow[];
     }
 
     return this.database.db

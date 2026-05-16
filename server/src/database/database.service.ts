@@ -176,5 +176,56 @@ export class DatabaseService implements OnModuleInit, OnApplicationShutdown {
           timestamp,
         );
     }
+
+    const existingServiceItems = this.db.prepare('SELECT COUNT(*) AS count FROM service_items').get() as {
+      count: number;
+    };
+
+    if (existingServiceItems.count === 0) {
+      const timestamp = nowIso();
+      const insert = this.db.prepare(
+        `INSERT INTO service_items
+          (id, type, title, subtitle, item_ref, content_json, position, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      );
+
+      insert.run(
+        'service-amazing-grace',
+        'song',
+        'Amazing Grace',
+        'Traditional',
+        'song-amazing-grace',
+        JSON.stringify({
+          id: 'song:song-amazing-grace',
+          type: 'song',
+          title: 'Amazing Grace',
+          subtitle: 'Traditional',
+          content:
+            'Amazing grace, how sweet the sound\nThat saved a wretch like me\nI once was lost, but now am found\nWas blind, but now I see',
+        }),
+        0,
+        timestamp,
+        timestamp,
+      );
+
+      insert.run(
+        'service-john-3-16',
+        'scripture',
+        'John 3:16',
+        'KJV',
+        'John 3:16',
+        JSON.stringify({
+          id: 'scripture:John 3:16:KJV',
+          type: 'scripture',
+          title: 'John 3:16',
+          subtitle: 'KJV',
+          content:
+            'For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.',
+        }),
+        1,
+        timestamp,
+        timestamp,
+      );
+    }
   }
 }
