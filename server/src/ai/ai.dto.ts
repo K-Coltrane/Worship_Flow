@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class TranscriptionInputDto {
   @IsString()
@@ -7,6 +7,14 @@ export class TranscriptionInputDto {
   @IsOptional()
   @IsString()
   source?: string;
+
+  @IsOptional()
+  @IsString()
+  translation?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  persist?: boolean;
 }
 
 export class AudioInputDto {

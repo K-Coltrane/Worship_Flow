@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Monitor, ArrowDown, Check } from 'lucide-react';
 import { motion } from 'motion/react';
+import { SlideContent } from './SlideContent';
 
 interface CenterPanelProps {
   previewSlide: any;
@@ -32,14 +33,7 @@ export function CenterPanel({ previewSlide, liveSlide, onGoLive }: CenterPanelPr
         </div>
         <div className="flex-1 min-h-0 bg-muted flex items-center justify-center p-8">
           {previewSlide ? (
-            <div className="text-center">
-              <h2 className="text-4xl text-foreground font-bold mb-4">{previewSlide.title}</h2>
-              {previewSlide.content && (
-                <p className="text-2xl text-foreground/90 leading-relaxed whitespace-pre-line">
-                  {previewSlide.content}
-                </p>
-              )}
-            </div>
+            <SlideContent slide={previewSlide} />
           ) : (
             <div className="text-center">
               <div className="text-muted-foreground text-xl mb-2">No preview</div>
@@ -87,14 +81,7 @@ export function CenterPanel({ previewSlide, liveSlide, onGoLive }: CenterPanelPr
         </div>
         <div className="flex-1 min-h-0 bg-background flex items-center justify-center p-8">
           {liveSlide ? (
-            <div className="text-center">
-              <h2 className="text-4xl text-foreground font-bold mb-4">{liveSlide.title}</h2>
-              {liveSlide.content && (
-                <p className="text-2xl text-foreground/90 leading-relaxed whitespace-pre-line">
-                  {liveSlide.content}
-                </p>
-              )}
-            </div>
+            <SlideContent slide={liveSlide} />
           ) : (
             <div className="text-center">
               <div className="text-muted-foreground text-xl mb-2">Nothing live</div>

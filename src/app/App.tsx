@@ -8,6 +8,8 @@ import { RightPanel } from './components/RightPanel';
 import { BottomPanel } from './components/BottomPanel';
 import { KeyboardHints } from './components/KeyboardHints';
 import { QuickHints } from './components/QuickHints';
+import { useSpeechRecognition } from './hooks/useSpeechRecognition';
+import type { LocalMediaItem } from './components/MediaBrowser';
 import {
   backendApi,
   connectRealtime,
@@ -19,13 +21,6 @@ import {
   ServiceFlowItem,
   songToPresentationContent,
 } from './lib/backend';
-
-const simulatedTranscription = [
-  'And the Lord says in John chapter 3 verse 16.',
-  'Turn with me to Psalm 23 verse 1.',
-  'As it says in Romans 8:28.',
-  'First Corinthians 13:4 tells us love is patient.',
-];
 
 const emptyPresentation: PresentationState = {
   preview: null,
@@ -44,7 +39,72 @@ export default function App() {
   const [backendStatus, setBackendStatus] = useState<'connecting' | 'connected' | 'offline'>(
     'connecting',
   );
-  const simulationIndexRef = useRef(0);
+  const [preferredTranslation, setPreferredTranslation] = useState('KJV');
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const lastInterimDetectionRef = useRef('');
+
+  const mergeDetections = useCallback((incoming: DetectedScripture[]) => {
+    if (incoming.length === 0) {
+      return;
+    }
+    setDetectedScriptures((current) => {
+      const merged = [...incoming];
+      for (const item of current) {
+        if (!merged.some((d) => d.id === item.id || d.reference === item.reference)) {
+          merged.push(item);
+        }
+      }
+      return merged.slice(0, 25);
+    });
+  }, []);
+
+  const runSpeechDetection = useCallback(
+    (text: string, persist: boolean) => {
+      const trimmed = text.trim();
+      if (trimmed.length < 8) {
+        return;
+      }
+      backendApi
+        .processTranscription(trimmed, preferredTranslation, 'microphone', persist)
+        .then(({ detections }) => mergeDetections(detections))
+        .catch((error) => {
+          console.error(error);
+          setBackendStatus('offline');
+        });
+    },
+    [mergeDetections, preferredTranslation],
+  );
+
+  const handleFinalTranscript = useCallback(
+    (text: string) => {
+      setInterimTranscript('');
+      lastInterimDetectionRef.current = '';
+      setTranscriptLines((current) => [...current.slice(-20), text]);
+      runSpeechDetection(text, true);
+    },
+    [runSpeechDetection],
+  );
+
+  const { status: micStatus } = useSpeechRecognition({
+    enabled: isMicActive,
+    onFinalTranscript: handleFinalTranscript,
+    onInterimTranscript: setInterimTranscript,
+  });
+
+  useEffect(() => {
+    if (!isMicActive) {
+      return;
+    }
+    const trimmed = interimTranscript.trim();
+    if (trimmed.length < 20 || trimmed === lastInterimDetectionRef.current) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      lastInterimDetectionRef.current = trimmed;
+      runSpeechDetection(trimmed, false);
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [interimTranscript, isMicActive, runSpeechDetection]);
 
   const refreshBackendState = useCallback(async () => {
     const [flow, state, detections] = await Promise.all([
@@ -80,32 +140,12 @@ export default function App() {
         }
       },
       onScriptureDetected: (scripture) => {
-        setDetectedScriptures((current) => [
-          scripture,
-          ...current.filter((item) => item.id !== scripture.id),
-        ]);
+        mergeDetections([scripture]);
       },
     });
 
     return () => socket.disconnect();
-  }, [refreshBackendState]);
-
-  useEffect(() => {
-    if (!isMicActive) {
-      return;
-    }
-
-    const timer = window.setInterval(() => {
-      const text = simulatedTranscription[simulationIndexRef.current % simulatedTranscription.length];
-      simulationIndexRef.current += 1;
-      backendApi.processTranscription(text).catch((error) => {
-        console.error(error);
-        setBackendStatus('offline');
-      });
-    }, 3000);
-
-    return () => window.clearInterval(timer);
-  }, [isMicActive]);
+  }, [mergeDetections, refreshBackendState]);
 
   const previewSlide = presentation.preview;
   const liveSlide = presentation.live;
@@ -215,9 +255,47 @@ export default function App() {
     [setActiveItem],
   );
 
-  const handleScriptureToPreview = useCallback(async (scripture: DetectedScripture) => {
-    const content = await backendApi.getScriptureContent(scripture.reference);
+  const handleScriptureToPreview = useCallback(
+    async (scripture: DetectedScripture) => {
+      const content = await backendApi.getScriptureContent(
+        scripture.reference,
+        preferredTranslation,
+      );
+      const state = await backendApi.setPreview(content);
+      setPresentation(state);
+    },
+    [preferredTranslation],
+  );
+
+  const handleScriptureLibraryPreview = useCallback(
+    async (verse: Parameters<typeof scriptureToPresentationContent>[0]) => {
+      const content = scriptureToPresentationContent(verse);
+      const state = await backendApi.setPreview(content);
+      setPresentation(state);
+    },
+    [],
+  );
+
+  const handleScriptureLibraryGoLive = useCallback(
+    async (verse: Parameters<typeof scriptureToPresentationContent>[0]) => {
+      const content = scriptureToPresentationContent(verse);
+      await backendApi.setPreview(content);
+      const state = await backendApi.goLive();
+      setPresentation(state);
+    },
+    [],
+  );
+
+  const handleMediaPreview = useCallback(async (item: LocalMediaItem) => {
+    const content = mediaToPresentationContent(item);
     const state = await backendApi.setPreview(content);
+    setPresentation(state);
+  }, []);
+
+  const handleMediaGoLive = useCallback(async (item: LocalMediaItem) => {
+    const content = mediaToPresentationContent(item);
+    await backendApi.setPreview(content);
+    const state = await backendApi.goLive();
     setPresentation(state);
   }, []);
 
@@ -312,6 +390,12 @@ export default function App() {
 
         <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
           <LeftPanel
+            preferredTranslation={preferredTranslation}
+            onTranslationChange={setPreferredTranslation}
+            onScripturePreview={(verse) => handleScriptureLibraryPreview(verse).catch(console.error)}
+            onScriptureGoLive={(verse) => handleScriptureLibraryGoLive(verse).catch(console.error)}
+            onMediaPreview={(item) => handleMediaPreview(item).catch(console.error)}
+            onMediaGoLive={(item) => handleMediaGoLive(item).catch(console.error)}
             onItemSelect={(item, type) => addItemToServiceFlow(item, type, false).catch(console.error)}
             onItemDoubleClick={(item, type) =>
               addItemToServiceFlow(item, type, true).catch(console.error)
@@ -323,6 +407,10 @@ export default function App() {
           <RightPanel
             isOpen={isAIOpen}
             isMicActive={isMicActive}
+            micStatus={micStatus}
+            interimTranscript={interimTranscript}
+            preferredTranslation={preferredTranslation}
+            onTranslationChange={setPreferredTranslation}
             transcriptLines={transcriptLines}
             detectedScriptures={detectedScriptures}
             onScriptureToPreview={(scripture) => handleScriptureToPreview(scripture).catch(console.error)}

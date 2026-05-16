@@ -6,6 +6,30 @@ import { ScriptureService } from './scripture.service';
 export class ScriptureController {
   constructor(private readonly scriptureService: ScriptureService) {}
 
+  @Get('translations')
+  listTranslations() {
+    return this.scriptureService.listTranslations();
+  }
+
+  @Get('books')
+  listBooks(@Query('translation') translation?: string) {
+    return this.scriptureService.listBooks(translation ?? 'KJV');
+  }
+
+  @Get('chapters')
+  listChapters(@Query('book') book: string, @Query('translation') translation?: string) {
+    return this.scriptureService.listChapters(book, translation ?? 'KJV');
+  }
+
+  @Get('chapter')
+  getChapter(
+    @Query('book') book: string,
+    @Query('chapter', ParseIntPipe) chapter: number,
+    @Query('translation') translation?: string,
+  ) {
+    return this.scriptureService.getChapter(book, chapter, translation ?? 'KJV');
+  }
+
   @Get('verse')
   getVerse(
     @Query('book') book: string,
@@ -18,11 +42,14 @@ export class ScriptureController {
 
   @Get('search')
   searchScripture(@Query('q') query: string, @Query('translation') translation?: string) {
-    return this.scriptureService.searchScripture(query ?? '', translation);
+    return this.scriptureService.searchScripture(query ?? '', translation ?? 'KJV');
   }
 
   @Get('passage')
-  getPassage(@Query('reference') reference: string, @Query('translation') translation?: string) {
+  getPassage(
+    @Query('reference') reference: string,
+    @Query('translation') translation?: string,
+  ) {
     const parsedReference = detectScriptureReferences(reference ?? '')[0];
     return this.scriptureService.buildPresentationContent(
       parsedReference ?? {
@@ -30,12 +57,12 @@ export class ScriptureController {
         book: reference,
         chapter: 1,
       },
-      translation,
+      translation ?? 'KJV',
     );
   }
 
   @Get('detect')
-  detectReferences(@Query('q') query: string) {
-    return this.scriptureService.detectReferences(query ?? '');
+  detectReferences(@Query('q') query: string, @Query('translation') translation?: string) {
+    return this.scriptureService.detectReferences(query ?? '', translation ?? 'KJV');
   }
 }

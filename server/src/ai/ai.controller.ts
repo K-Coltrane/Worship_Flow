@@ -8,7 +8,12 @@ export class AiController {
 
   @Post('transcriptions')
   processText(@Body() input: TranscriptionInputDto) {
-    return this.aiService.processText(input.text, input.source);
+    return this.aiService.processText(
+      input.text,
+      input.source,
+      input.translation,
+      input.persist !== false,
+    );
   }
 
   @Post('audio')

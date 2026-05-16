@@ -1,25 +1,5 @@
 import { ScriptureReference } from '../common/domain.types';
-
-const bookAliases: Record<string, string[]> = {
-  Genesis: ['genesis', 'gen'],
-  Exodus: ['exodus', 'exod'],
-  Psalm: ['psalm', 'psalms', 'ps'],
-  Proverbs: ['proverbs', 'prov'],
-  Isaiah: ['isaiah', 'isa'],
-  Matthew: ['matthew', 'matt'],
-  Mark: ['mark'],
-  Luke: ['luke'],
-  John: ['john', 'jn'],
-  Acts: ['acts'],
-  Romans: ['romans', 'rom'],
-  '1 Corinthians': ['1 corinthians', 'first corinthians', 'one corinthians', 'i corinthians'],
-  '2 Corinthians': ['2 corinthians', 'second corinthians', 'two corinthians', 'ii corinthians'],
-  Galatians: ['galatians', 'gal'],
-  Ephesians: ['ephesians', 'eph'],
-  Philippians: ['philippians', 'phil'],
-  Colossians: ['colossians', 'col'],
-  Revelation: ['revelation', 'rev'],
-};
+import { bookAliases } from './bible-books';
 
 const numberWords: Record<string, string> = {
   one: '1',
@@ -54,6 +34,25 @@ export interface ParsedScriptureReference extends ScriptureReference {
 export function detectScriptureReferences(input: string): ParsedScriptureReference[] {
   const normalized = normalizeReferenceInput(input);
   const matches: ParsedScriptureReference[] = [];
+
+  const colonPattern =
+    /\b([1-3]?\s?[a-z]+)\s+(\d+)\s*:\s*(\d+)(?:\s*(?:-|to|through)\s*(\d+))?/gi;
+  for (const match of normalized.matchAll(colonPattern)) {
+    const book = canonicalBookName(match[1]);
+    const chapter = Number(match[2]);
+    const verseStart = Number(match[3]);
+    const verseEnd = match[4] ? Number(match[4]) : verseStart;
+    if (Number.isInteger(chapter) && chapter > 0 && Number.isInteger(verseStart) && verseStart > 0) {
+      matches.push({
+        book,
+        chapter,
+        verseStart,
+        verseEnd,
+        reference: formatReference(book, chapter, verseStart, verseEnd),
+        confidence: 0.95,
+      });
+    }
+  }
 
   for (const [book, aliases] of Object.entries(bookAliases)) {
     for (const alias of aliases) {

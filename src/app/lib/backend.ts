@@ -75,6 +75,20 @@ export interface ScriptureLibraryItem extends ScriptureVerse {
   version: string;
 }
 
+export interface TranslationInfo {
+  code: string;
+  label: string;
+  language: string;
+  verseCount: number;
+}
+
+export interface BibleBookInfo {
+  name: string;
+  testament: 'OT' | 'NT';
+  chapters: number;
+  versesAvailable: number;
+}
+
 export interface TranscriptionUpdate {
   text: string;
   engine: string;
@@ -147,9 +161,29 @@ export const backendApi = {
       body: JSON.stringify({}),
     }),
   searchSongs: (query = '') => request<Song[]>(`/songs?q=${encodeURIComponent(query)}`),
-  searchScriptures: async (query = '') => {
+  listTranslations: () => request<TranslationInfo[]>('/scripture/translations'),
+  listBibleBooks: (translation = 'KJV') =>
+    request<BibleBookInfo[]>(
+      `/scripture/books?translation=${encodeURIComponent(translation)}`,
+    ),
+  listBibleChapters: (book: string, translation = 'KJV') =>
+    request<number[]>(
+      `/scripture/chapters?book=${encodeURIComponent(book)}&translation=${encodeURIComponent(translation)}`,
+    ),
+  getBibleChapter: async (book: string, chapter: number, translation = 'KJV') => {
     const verses = await request<ScriptureVerse[]>(
-      `/scripture/search?q=${encodeURIComponent(query)}`,
+      `/scripture/chapter?book=${encodeURIComponent(book)}&chapter=${chapter}&translation=${encodeURIComponent(translation)}`,
+    );
+    return verses.map((verse) => ({
+      ...verse,
+      id: `${verse.book}-${verse.chapter}-${verse.verse}-${verse.translation}`,
+      reference: `${verse.book} ${verse.chapter}:${verse.verse}`,
+      version: verse.translation,
+    }));
+  },
+  searchScriptures: async (query = '', translation = 'KJV') => {
+    const verses = await request<ScriptureVerse[]>(
+      `/scripture/search?q=${encodeURIComponent(query)}&translation=${encodeURIComponent(translation)}`,
     );
 
     return verses.map((verse) => ({
@@ -159,16 +193,21 @@ export const backendApi = {
       version: verse.translation,
     }));
   },
-  getScriptureContent: (reference: string) =>
+  getScriptureContent: (reference: string, translation = 'KJV') =>
     request<PresentationContent>(
-      `/scripture/passage?reference=${encodeURIComponent(reference)}`,
+      `/scripture/passage?reference=${encodeURIComponent(reference)}&translation=${encodeURIComponent(translation)}`,
     ),
-  processTranscription: (text: string, source = 'browser-simulation') =>
+  processTranscription: (
+    text: string,
+    translation = 'KJV',
+    source = 'microphone',
+    persist = true,
+  ) =>
     request<{ transcription: TranscriptionUpdate; detections: DetectedScripture[] }>(
       '/ai/transcriptions',
       {
         method: 'POST',
-        body: JSON.stringify({ text, source }),
+        body: JSON.stringify({ text, source, translation, persist }),
       },
     ),
   listDetections: () => request<DetectedScripture[]>('/ai/scripture-detections'),
@@ -228,13 +267,23 @@ export function scriptureToPresentationContent(scripture: ScriptureLibraryItem):
   };
 }
 
-export function mediaToPresentationContent(media: { id: string; name: string; type: string }) {
+export function mediaToPresentationContent(media: {
+  id: string;
+  name: string;
+  type: string;
+  url?: string;
+  relativePath?: string;
+  mimeType?: string;
+}) {
   return {
     id: `media:${media.id}`,
     type: 'media' as const,
     title: media.name,
     subtitle: media.type,
-    content: `Media item: ${media.name}`,
-    payload: media,
+    content: media.url ? '' : `Media item: ${media.name}`,
+    payload: {
+      ...media,
+      mediaUrl: media.url,
+    },
   };
 }

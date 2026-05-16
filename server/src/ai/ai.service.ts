@@ -31,9 +31,9 @@ export class AiService {
     private readonly speechToText: SpeechToTextService,
   ) {}
 
-  processText(text: string, source = 'manual') {
+  processText(text: string, source = 'manual', translation = 'KJV', persist = true) {
     const transcription = this.speechToText.fromText(text);
-    return this.processTranscription(transcription, source);
+    return this.processTranscription(transcription, source, translation, persist);
   }
 
   async processAudio(audioBase64: string) {
@@ -57,7 +57,12 @@ export class AiService {
     return rows.map((row) => this.mapDetection(row));
   }
 
-  private processTranscription(transcription: TranscriptionResult, source: string) {
+  private processTranscription(
+    transcription: TranscriptionResult,
+    source: string,
+    translation = 'KJV',
+    persist = true,
+  ) {
     const timestamp = nowIso();
     const transcriptPayload = {
       text: transcription.text,
@@ -71,13 +76,27 @@ export class AiService {
 
     try {
       const detections = transcription.text
-        ? this.scriptureService.detectReferences(transcription.text).map((reference) =>
-            this.storeDetection({
-              ...reference,
-              confidence: Math.min(reference.confidence, transcription.confidence),
-              sourceText: transcription.text,
-            }),
-          )
+        ? this.scriptureService
+            .detectFromSpeech(transcription.text, translation)
+            .map((reference) =>
+              persist
+                ? this.storeDetection({
+                    ...reference,
+                    confidence: Math.min(reference.confidence, transcription.confidence),
+                    sourceText: transcription.text,
+                  })
+                : {
+                    id: `ephemeral-${reference.reference}`,
+                    reference: reference.reference,
+                    book: reference.book,
+                    chapter: reference.chapter,
+                    verseStart: reference.verseStart,
+                    verseEnd: reference.verseEnd,
+                    confidence: Math.min(reference.confidence, transcription.confidence),
+                    sourceText: transcription.text,
+                    timestamp: timestamp,
+                  },
+            )
         : [];
 
       detections.forEach((detection) =>
