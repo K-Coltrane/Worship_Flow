@@ -2,9 +2,13 @@
   "name": "@figma/my-make-file",
   "private": true,
   "version": "0.0.1",
+  "description": "Lumina Worship desktop presentation system",
+  "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
     "build": "vite build",
+    "desktop:build": "npm run backend:build && npm run build",
+    "desktop:dist:win": "npm run desktop:build && electron-builder --win nsis --x64",
     "dev": "vite",
     "backend:dev": "TS_NODE_PROJECT=tsconfig.backend.json node -r ts-node/register server/src/main.ts",
     "backend:build": "tsc -p tsconfig.backend.json && node server/scripts/write-dist-package.cjs",
@@ -89,6 +93,8 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.8.0",
     "@vitejs/plugin-react": "4.7.0",
+    "electron": "^42.2.0",
+    "electron-builder": "^26.8.1",
     "tailwindcss": "4.1.12",
     "ts-node": "^10.9.2",
     "tsx": "^4.22.0",
@@ -110,6 +116,39 @@
   "pnpm": {
     "overrides": {
       "vite": "6.3.5"
+    }
+  },
+  "build": {
+    "appId": "com.lumina.worship",
+    "productName": "Lumina Worship",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "server/dist/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*"
+    ],
+    "win": {
+      "artifactName": "${productName} Setup ${version}.${ext}",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "oneClick": false
     }
   }
 }
