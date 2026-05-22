@@ -1,21 +1,51 @@
 import { Injectable, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
-import Database, { Database as SqliteDatabase } from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { nowIso } from '../common/time';
+
+class WorshipDatabase {
+  constructor(private readonly database: DatabaseSync) {}
+
+  prepare(sql: string) {
+    return this.database.prepare(sql);
+  }
+
+  exec(sql: string): void {
+    this.database.exec(sql);
+  }
+
+  close(): void {
+    this.database.close();
+  }
+
+  transaction<T extends (...args: never[]) => unknown>(callback: T): T {
+    return ((...args: Parameters<T>): ReturnType<T> => {
+      this.database.exec('BEGIN');
+      try {
+        const result = callback(...args) as ReturnType<T>;
+        this.database.exec('COMMIT');
+        return result;
+      } catch (error) {
+        this.database.exec('ROLLBACK');
+        throw error;
+      }
+    }) as T;
+  }
+}
 
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnApplicationShutdown {
-  private connection?: SqliteDatabase;
+  private connection?: WorshipDatabase;
 
   onModuleInit(): void {
     const dbPath = process.env.WORSHIP_DB_PATH ?? join(process.cwd(), 'data', 'worship.sqlite');
     mkdirSync(dirname(dbPath), { recursive: true });
 
-    this.connection = new Database(dbPath);
-    this.connection.pragma('journal_mode = WAL');
-    this.connection.pragma('foreign_keys = ON');
-    this.connection.pragma('busy_timeout = 5000');
+    this.connection = new WorshipDatabase(new DatabaseSync(dbPath));
+    this.connection.exec('PRAGMA journal_mode = WAL');
+    this.connection.exec('PRAGMA foreign_keys = ON');
+    this.connection.exec('PRAGMA busy_timeout = 5000');
 
     this.migrate();
     this.seedOfflineContent();
@@ -25,7 +55,7 @@ export class DatabaseService implements OnModuleInit, OnApplicationShutdown {
     this.connection?.close();
   }
 
-  get db(): SqliteDatabase {
+  get db(): WorshipDatabase {
     if (!this.connection) {
       throw new Error('Database connection has not been initialized');
     }

@@ -3,6 +3,7 @@ node_modules/
 server/data/bibles/
 data/
 dist/
+release/
 data/
 server/dist/
 .DS_Store
