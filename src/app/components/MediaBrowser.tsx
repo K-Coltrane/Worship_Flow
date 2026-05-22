@@ -22,9 +22,34 @@ interface MediaBrowserProps {
   onGoLive: (item: LocalMediaItem) => void;
 }
 
-type DirEntry =
-  | { kind: 'dir'; name: string; handle: FileSystemDirectoryHandle }
-  | { kind: 'file'; name: string; media: LocalMediaItem };
+type FolderListItem = {
+  name: string;
+  handle: FileSystemDirectoryHandle | null;
+};
+
+type FallbackFile = {
+  file: File;
+  relativePath: string;
+};
+
+const SYSTEM_SKIP_NAMES = new Set([
+  '.ds_store',
+  'thumbs.db',
+  'desktop.ini',
+  'icon\r',
+  '.localized',
+  '.trashes',
+  '.fseventd',
+  '.spotlight-v100',
+  '.temporaryitems',
+]);
+
+function shouldSkipEntry(name: string): boolean {
+  if (!name || name.startsWith('.')) {
+    return true;
+  }
+  return SYSTEM_SKIP_NAMES.has(name.toLowerCase());
+}
 
 function mediaTypeFromName(name: string, mimeType: string): LocalMediaItem['type'] {
   const lower = name.toLowerCase();
@@ -40,19 +65,93 @@ function mediaTypeFromName(name: string, mimeType: string): LocalMediaItem['type
   return 'other';
 }
 
+function fileToMediaItem(file: File, relativePath: string): LocalMediaItem | null {
+  const name = file.name;
+  const type = mediaTypeFromName(name, file.type);
+  if (type === 'other') {
+    return null;
+  }
+  const url = URL.createObjectURL(file);
+  return {
+    id: relativePath,
+    name,
+    type,
+    url,
+    relativePath,
+    mimeType: file.type,
+  };
+}
+
+function listFallbackAtPath(
+  catalog: FallbackFile[],
+  pathInsideRoot: string[],
+): { folders: string[]; imagesVideos: LocalMediaItem[]; audio: LocalMediaItem[] } {
+  const folderNames = new Set<string>();
+  const imagesVideos: LocalMediaItem[] = [];
+  const audio: LocalMediaItem[] = [];
+
+  for (const { file, relativePath } of catalog) {
+    const segments = relativePath.split('/').filter(Boolean);
+    if (segments.length < 2) {
+      continue;
+    }
+    const inner = segments.slice(1);
+    if (pathInsideRoot.length > inner.length) {
+      continue;
+    }
+    let matches = true;
+    for (let i = 0; i < pathInsideRoot.length; i++) {
+      if (inner[i] !== pathInsideRoot[i]) {
+        matches = false;
+        break;
+      }
+    }
+    if (!matches) {
+      continue;
+    }
+    const rest = inner.slice(pathInsideRoot.length);
+    if (rest.length === 0) {
+      continue;
+    }
+    if (rest.length === 1) {
+      const item = fileToMediaItem(file, relativePath);
+      if (!item) {
+        continue;
+      }
+      if (item.type === 'audio') {
+        audio.push(item);
+      } else {
+        imagesVideos.push(item);
+      }
+    } else if (!shouldSkipEntry(rest[0])) {
+      folderNames.add(rest[0]);
+    }
+  }
+
+  imagesVideos.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  audio.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+  return {
+    folders: [...folderNames].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
+    imagesVideos,
+    audio,
+  };
+}
+
 export function MediaBrowser({ onPreview, onGoLive }: MediaBrowserProps) {
   const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [rootName, setRootName] = useState<string | null>(null);
-  const [pathStack, setPathStack] = useState<{ name: string; handle: FileSystemDirectoryHandle }[]>(
-    [],
-  );
-  const [folders, setFolders] = useState<Extract<DirEntry, { kind: 'dir' }>[]>([]);
+  const [pathStack, setPathStack] = useState<FolderListItem[]>([]);
+  const [folders, setFolders] = useState<FolderListItem[]>([]);
   const [mediaFiles, setMediaFiles] = useState<LocalMediaItem[]>([]);
   const [audioFiles, setAudioFiles] = useState<LocalMediaItem[]>([]);
+  const [fallbackCatalog, setFallbackCatalog] = useState<FallbackFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [supportsPicker, setSupportsPicker] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activeFolderName, setActiveFolderName] = useState<string | null>(null);
   const objectUrlsRef = useRef<string[]>([]);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
@@ -63,47 +162,68 @@ export function MediaBrowser({ onPreview, onGoLive }: MediaBrowserProps) {
     objectUrlsRef.current = [];
   }, []);
 
+  const trackObjectUrls = useCallback((items: LocalMediaItem[]) => {
+    for (const item of items) {
+      objectUrlsRef.current.push(item.url);
+    }
+  }, []);
+
   useEffect(() => {
     setSupportsPicker(typeof window.showDirectoryPicker === 'function');
     return () => revokeObjectUrls();
   }, [revokeObjectUrls]);
 
   const loadDirectory = useCallback(
-    async (dir: FileSystemDirectoryHandle, basePath: string) => {
+    async (dir: FileSystemDirectoryHandle, pathInsideRoot: FolderListItem[]) => {
       setIsLoading(true);
       setError(null);
+      setNotice(null);
       revokeObjectUrls();
 
       try {
-        const dirEntries: Extract<DirEntry, { kind: 'dir' }>[] = [];
+        if ('requestPermission' in dir) {
+          const permission = await (
+            dir as FileSystemDirectoryHandle & {
+              requestPermission: (o: { mode: 'read' }) => Promise<string>;
+            }
+          ).requestPermission({ mode: 'read' });
+          if (permission !== 'granted') {
+            setError('Permission to read this folder was denied.');
+            return;
+          }
+        }
+
+        const dirEntries: FolderListItem[] = [];
         const imagesVideos: LocalMediaItem[] = [];
         const audio: LocalMediaItem[] = [];
+        let skipped = 0;
 
         for await (const [name, handle] of dir.entries()) {
-          if (handle.kind === 'directory') {
-            dirEntries.push({ kind: 'dir', name, handle });
+          if (shouldSkipEntry(name)) {
             continue;
           }
-          const file = await handle.getFile();
-          const type = mediaTypeFromName(name, file.type);
-          if (type === 'other') {
-            continue;
-          }
-          const url = URL.createObjectURL(file);
-          objectUrlsRef.current.push(url);
-          const relativePath = basePath ? `${basePath}/${name}` : name;
-          const item: LocalMediaItem = {
-            id: relativePath,
-            name,
-            type,
-            url,
-            relativePath,
-            mimeType: file.type,
-          };
-          if (type === 'audio') {
-            audio.push(item);
-          } else {
-            imagesVideos.push(item);
+
+          try {
+            if (handle.kind === 'directory') {
+              dirEntries.push({ name, handle });
+              continue;
+            }
+
+            const file = await (handle as FileSystemFileHandle).getFile();
+            const basePath = pathInsideRoot.map((p) => p.name).join('/');
+            const relativePath = basePath ? `${basePath}/${name}` : name;
+            const item = fileToMediaItem(file, relativePath);
+            if (!item) {
+              continue;
+            }
+            objectUrlsRef.current.push(item.url);
+            if (item.type === 'audio') {
+              audio.push(item);
+            } else {
+              imagesVideos.push(item);
+            }
+          } catch {
+            skipped++;
           }
         }
 
@@ -117,9 +237,13 @@ export function MediaBrowser({ onPreview, onGoLive }: MediaBrowserProps) {
         setMediaFiles(imagesVideos);
         setAudioFiles(audio);
         setSelectedId(null);
+
+        if (skipped > 0) {
+          setNotice(`Skipped ${skipped} file(s) that could not be read (system or protected files).`);
+        }
       } catch (err) {
         console.error(err);
-        setError('Could not read this folder. Try choosing the folder again.');
+        setError('Could not open this folder. Try another folder or use Chrome/Edge.');
       } finally {
         setIsLoading(false);
       }
@@ -127,18 +251,67 @@ export function MediaBrowser({ onPreview, onGoLive }: MediaBrowserProps) {
     [revokeObjectUrls],
   );
 
+  const loadFallbackPath = useCallback(
+    (pathInsideRoot: FolderListItem[]) => {
+      setIsLoading(true);
+      setError(null);
+      setNotice(null);
+      revokeObjectUrls();
+
+      const pathNames = pathInsideRoot.map((p) => p.name);
+      const { folders: folderNames, imagesVideos, audio } = listFallbackAtPath(
+        fallbackCatalog,
+        pathNames,
+      );
+
+      trackObjectUrls([...imagesVideos, ...audio]);
+      setFolders(folderNames.map((name) => ({ name, handle: null })));
+      setMediaFiles(imagesVideos);
+      setAudioFiles(audio);
+      setSelectedId(null);
+      setIsLoading(false);
+    },
+    [fallbackCatalog, revokeObjectUrls, trackObjectUrls],
+  );
+
+  const applyPath = useCallback(
+    async (pathInsideRoot: FolderListItem[], activeName: string | null) => {
+      setPathStack(pathInsideRoot);
+      setActiveFolderName(activeName);
+
+      if (rootHandle && pathInsideRoot.length > 0) {
+        const last = pathInsideRoot[pathInsideRoot.length - 1];
+        if (last.handle) {
+          await loadDirectory(last.handle, pathInsideRoot);
+          return;
+        }
+      }
+      if (rootHandle && pathInsideRoot.length === 0) {
+        await loadDirectory(rootHandle, []);
+        return;
+      }
+      if (!rootHandle && fallbackCatalog.length > 0) {
+        loadFallbackPath(pathInsideRoot);
+      }
+    },
+    [rootHandle, fallbackCatalog, loadDirectory, loadFallbackPath],
+  );
+
   const openDirectory = useCallback(
     async (dir: FileSystemDirectoryHandle) => {
       setRootHandle(dir);
       setRootName(dir.name);
+      setFallbackCatalog([]);
       setPathStack([]);
-      await loadDirectory(dir, '');
+      setActiveFolderName(dir.name);
+      await loadDirectory(dir, []);
     },
     [loadDirectory],
   );
 
   const chooseFolder = async () => {
     setError(null);
+    setNotice(null);
     try {
       if (window.showDirectoryPicker) {
         const dir = await window.showDirectoryPicker({ mode: 'read' });
@@ -154,25 +327,22 @@ export function MediaBrowser({ onPreview, onGoLive }: MediaBrowserProps) {
     }
   };
 
-  const enterFolder = async (entry: Extract<DirEntry, { kind: 'dir' }>) => {
-    const nextPath = [...pathStack, { name: entry.name, handle: entry.handle }];
-    setPathStack(nextPath);
-    const basePath = nextPath.map((p) => p.name).join('/');
-    await loadDirectory(entry.handle, basePath);
+  const enterFolder = async (folder: FolderListItem) => {
+    const nextPath = [...pathStack, folder];
+    await applyPath(nextPath, folder.name);
+  };
+
+  const goToRoot = async () => {
+    await applyPath([], rootName);
   };
 
   const goUp = async () => {
-    if (pathStack.length === 0 || !rootHandle) {
+    if (pathStack.length === 0) {
       return;
     }
     const next = pathStack.slice(0, -1);
-    setPathStack(next);
-    if (next.length === 0) {
-      await loadDirectory(rootHandle, '');
-      return;
-    }
-    const basePath = next.map((p) => p.name).join('/');
-    await loadDirectory(next[next.length - 1].handle, basePath);
+    const activeName = next.length > 0 ? next[next.length - 1].name : rootName;
+    await applyPath(next, activeName);
   };
 
   const onFallbackFolderInput = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -181,43 +351,27 @@ export function MediaBrowser({ onPreview, onGoLive }: MediaBrowserProps) {
       return;
     }
     revokeObjectUrls();
-    const files = Array.from(fileList);
+    const files = Array.from(fileList).filter((f) => !shouldSkipEntry(f.name));
     const folderName = files[0]?.webkitRelativePath?.split('/')[0] ?? 'Selected folder';
+
+    const catalog: FallbackFile[] = files.map((file) => ({
+      file,
+      relativePath: file.webkitRelativePath || file.name,
+    }));
+
     setRootName(folderName);
     setRootHandle(null);
+    setFallbackCatalog(catalog);
     setPathStack([]);
-    setFolders([]);
+    setActiveFolderName(folderName);
+    setError(null);
 
-    const imagesVideos: LocalMediaItem[] = [];
-    const audio: LocalMediaItem[] = [];
-
-    for (const file of files) {
-      const name = file.name;
-      const type = mediaTypeFromName(name, file.type);
-      if (type === 'other') {
-        continue;
-      }
-      const url = URL.createObjectURL(file);
-      objectUrlsRef.current.push(url);
-      const item: LocalMediaItem = {
-        id: file.webkitRelativePath || name,
-        name,
-        type,
-        url,
-        relativePath: file.webkitRelativePath || name,
-        mimeType: file.type,
-      };
-      if (type === 'audio') {
-        audio.push(item);
-      } else {
-        imagesVideos.push(item);
-      }
-    }
-
-    imagesVideos.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-    audio.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    const { folders: folderNames, imagesVideos, audio } = listFallbackAtPath(catalog, []);
+    trackObjectUrls([...imagesVideos, ...audio]);
+    setFolders(folderNames.map((name) => ({ name, handle: null })));
     setMediaFiles(imagesVideos);
     setAudioFiles(audio);
+    setSelectedId(null);
     event.target.value = '';
   };
 
@@ -229,6 +383,8 @@ export function MediaBrowser({ onPreview, onGoLive }: MediaBrowserProps) {
   }, [pathStack, rootName]);
 
   const currentFolderLabel = breadcrumbs[breadcrumbs.length - 1] ?? rootName;
+
+  const isRootActive = activeFolderName === rootName && pathStack.length === 0;
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -251,7 +407,7 @@ export function MediaBrowser({ onPreview, onGoLive }: MediaBrowserProps) {
         />
         {rootName && (
           <div className="flex items-center gap-1 min-w-0 text-xs text-[#aaa]">
-            {pathStack.length > 0 && rootHandle && (
+            {pathStack.length > 0 && (
               <button
                 type="button"
                 onClick={goUp}
@@ -275,11 +431,14 @@ export function MediaBrowser({ onPreview, onGoLive }: MediaBrowserProps) {
       </div>
 
       {error && <p className="px-3 py-1 text-xs text-red-400 shrink-0">{error}</p>}
+      {notice && !error && (
+        <p className="px-3 py-1 text-xs text-amber-500/90 shrink-0">{notice}</p>
+      )}
 
       {!rootName && !isLoading && (
         <p className="p-4 text-sm text-[#666]">
-          Choose a folder to browse images and videos. Open a subfolder on the left to see its
-          thumbnails on the right.
+          Choose a folder to browse images and videos. Click a folder on the left to show its media
+          on the right.
         </p>
       )}
 
@@ -289,7 +448,19 @@ export function MediaBrowser({ onPreview, onGoLive }: MediaBrowserProps) {
             <div className="px-2 py-1.5 border-b border-[#3a3a3a] text-[10px] font-semibold text-[#888] uppercase tracking-wide">
               Folders
             </div>
-            {pathStack.length > 0 && rootHandle && (
+            <button
+              type="button"
+              onClick={goToRoot}
+              className={`w-full text-left px-2 py-2 text-xs border-b border-[#333] flex items-center gap-2 ${
+                isRootActive
+                  ? 'bg-blue-900/50 text-blue-200'
+                  : 'text-[#ccc] hover:bg-[#2f2f2f]'
+              }`}
+            >
+              <FolderOpen size={14} className="text-amber-500 shrink-0" />
+              <span className="truncate">{rootName}</span>
+            </button>
+            {pathStack.length > 0 && (
               <button
                 type="button"
                 onClick={goUp}
@@ -300,19 +471,26 @@ export function MediaBrowser({ onPreview, onGoLive }: MediaBrowserProps) {
               </button>
             )}
             {folders.length === 0 && !isLoading && (
-              <p className="p-2 text-[10px] text-[#666] italic">No subfolders</p>
+              <p className="p-2 text-[10px] text-[#666] italic">No subfolders here</p>
             )}
-            {folders.map((folder) => (
-              <button
-                key={folder.name}
-                type="button"
-                onClick={() => enterFolder(folder)}
-                className="w-full text-left px-2 py-2 text-xs text-[#ccc] hover:bg-[#2f2f2f] border-b border-[#333] flex items-center gap-2"
-              >
-                <Folder size={14} className="text-amber-500 shrink-0" />
-                <span className="truncate">{folder.name}</span>
-              </button>
-            ))}
+            {folders.map((folder) => {
+              const isActive = activeFolderName === folder.name;
+              return (
+                <button
+                  key={`${folder.name}-${pathStack.length}`}
+                  type="button"
+                  onClick={() => enterFolder(folder)}
+                  className={`w-full text-left px-2 py-2 text-xs border-b border-[#333] flex items-center gap-2 ${
+                    isActive
+                      ? 'bg-blue-900/50 text-blue-200'
+                      : 'text-[#ccc] hover:bg-[#2f2f2f]'
+                  }`}
+                >
+                  <Folder size={14} className="text-amber-500 shrink-0" />
+                  <span className="truncate">{folder.name}</span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="flex-1 flex flex-col min-w-0 min-h-0">
@@ -329,7 +507,7 @@ export function MediaBrowser({ onPreview, onGoLive }: MediaBrowserProps) {
               {isLoading && <p className="text-sm text-[#888]">Loading…</p>}
               {!isLoading && mediaFiles.length === 0 && (
                 <p className="text-sm text-[#666] p-2">
-                  No images or videos in this folder. Open a subfolder or choose another location.
+                  No images or videos in this folder. Select another folder on the left.
                 </p>
               )}
               {!isLoading && mediaFiles.length > 0 && (

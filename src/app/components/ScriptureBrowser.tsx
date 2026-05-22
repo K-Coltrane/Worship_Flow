@@ -10,6 +10,7 @@ interface ScriptureBrowserProps {
   onTranslationChange: (translation: string) => void;
   onPreview: (verse: ScriptureLibraryItem) => void;
   onGoLive: (verse: ScriptureLibraryItem) => void;
+  onProjectPassage: (reference: string, translation: string) => void;
 }
 
 export function ScriptureBrowser({
@@ -17,8 +18,10 @@ export function ScriptureBrowser({
   onTranslationChange,
   onPreview,
   onGoLive,
+  onProjectPassage,
 }: ScriptureBrowserProps) {
   const [view, setView] = useState<BrowseView>('books');
+  const lastEnterRef = useRef<{ query: string; at: number } | null>(null);
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
   const [translations, setTranslations] = useState<TranslationInfo[]>([]);
@@ -87,10 +90,10 @@ export function ScriptureBrowser({
     [preferredTranslation],
   );
 
-  const handleSearchSubmit = async () => {
+  const handleSearchSubmit = async (): Promise<ScriptureLibraryItem | null> => {
     const query = searchQuery.trim();
     if (!query) {
-      return;
+      return null;
     }
 
     setIsLoading(true);
@@ -99,18 +102,52 @@ export function ScriptureBrowser({
       const results = await backendApi.searchScriptures(query, preferredTranslation);
       if (results.length === 0) {
         setError('No matching verses.');
-        return;
+        return null;
       }
       const first = results[0];
       setSelectedBook(first.book);
       setSelectedChapter(first.chapter);
-      setVerses(results.filter((v) => v.chapter === first.chapter && v.book === first.book));
+      const chapterVerses = results.filter(
+        (v) => v.chapter === first.chapter && v.book === first.book,
+      );
+      setVerses(chapterVerses);
       setView('verses');
+      return first;
     } catch (err) {
       console.error(err);
       setError('Search failed.');
+      return null;
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSearchKeyDown = async (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') {
+      return;
+    }
+    event.preventDefault();
+
+    const query = searchQuery.trim();
+    if (!query) {
+      return;
+    }
+
+    const now = Date.now();
+    const last = lastEnterRef.current;
+    const isSecondEnter =
+      last !== null && last.query === query && now - last.at < 2500;
+
+    if (isSecondEnter) {
+      lastEnterRef.current = null;
+      onProjectPassage(query, preferredTranslation);
+      return;
+    }
+
+    lastEnterRef.current = { query, at: now };
+    const first = await handleSearchSubmit();
+    if (first) {
+      onPreview(first);
     }
   };
 
@@ -159,17 +196,6 @@ export function ScriptureBrowser({
             <ChevronLeft size={18} />
           </button>
         )}
-        <TranslationSearchPicker
-          translations={translations}
-          value={preferredTranslation}
-          onChange={(code) => {
-            onTranslationChange(code);
-            goToBooks();
-          }}
-          label=""
-          tone="toolbar"
-          className="flex-1 min-w-0"
-        />
         <div className="relative flex flex-1 min-w-0 gap-1.5">
           <Search
             className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#666] pointer-events-none"
@@ -178,9 +204,13 @@ export function ScriptureBrowser({
           <input
             type="text"
             placeholder="Genesis 1 or John 3:16…"
+            title="Enter to search and preview; press Enter again to project live"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              lastEnterRef.current = null;
+            }}
+            onKeyDown={handleSearchKeyDown}
             className="flex-1 min-w-0 pl-8 pr-2 py-2 bg-[#2a2a2a] border border-[#444] rounded text-[#e0e0e0] text-sm placeholder:text-[#666] focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
           <button
@@ -191,6 +221,17 @@ export function ScriptureBrowser({
             Go
           </button>
         </div>
+        <TranslationSearchPicker
+          translations={translations}
+          value={preferredTranslation}
+          onChange={(code) => {
+            onTranslationChange(code);
+            goToBooks();
+          }}
+          label=""
+          tone="toolbar"
+          className="flex-1 min-w-0 max-w-[280px]"
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto min-h-0">

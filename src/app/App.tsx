@@ -295,6 +295,14 @@ export default function App() {
     [],
   );
 
+  const handleScriptureSearchProject = useCallback(
+    async (reference: string, translation: string) => {
+      const state = await backendApi.projectScripture(reference, translation);
+      setPresentation(state);
+    },
+    [],
+  );
+
   const handleMediaPreview = useCallback(async (item: LocalMediaItem) => {
     const content = mediaToPresentationContent(item);
     const state = await backendApi.setPreview(content);
@@ -465,6 +473,9 @@ export default function App() {
               }
               onScriptureGoLive={(verse) =>
                 handleScriptureLibraryGoLive(verse).catch(console.error)
+              }
+              onScriptureProject={(reference, translation) =>
+                handleScriptureSearchProject(reference, translation).catch(console.error)
               }
               onMediaPreview={(item) => handleMediaPreview(item).catch(console.error)}
               onMediaGoLive={(item) => handleMediaGoLive(item).catch(console.error)}

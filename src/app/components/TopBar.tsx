@@ -154,8 +154,9 @@ export function TopBar({
 
           <button
             type="button"
+            onClick={() => window.open('/output', 'lumina-output', 'noopener')}
             className="p-1.5 bg-[#333] hover:bg-[#444] text-[#ccc] rounded hidden lg:flex"
-            title="Output monitor"
+            title="Open output window for projectors (fullscreen on each display)"
           >
             <Monitor size={16} />
           </button>

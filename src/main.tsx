@@ -1,10 +1,5 @@
 import { createRoot } from 'react-dom/client';
-import { ThemeProvider } from 'next-themes';
-import App from './app/App.tsx';
+import { Root } from './app/Root.tsx';
 import './styles/index.css';
 
-createRoot(document.getElementById('root')!).render(
-  <ThemeProvider attribute="class" defaultTheme="dark" enableSystem storageKey="lumina-theme">
-    <App />
-  </ThemeProvider>
-);
+createRoot(document.getElementById('root')!).render(<Root />);

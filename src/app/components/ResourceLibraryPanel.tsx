@@ -12,6 +12,7 @@ interface ResourceLibraryPanelProps {
   onTranslationChange: (translation: string) => void;
   onScripturePreview: (verse: ScriptureLibraryItem) => void;
   onScriptureGoLive: (verse: ScriptureLibraryItem) => void;
+  onScriptureProject: (reference: string, translation: string) => void;
   onMediaPreview: (item: LocalMediaItem) => void;
   onMediaGoLive: (item: LocalMediaItem) => void;
   onSongPreview: (song: Song, segmentIndex?: number) => void;
@@ -23,6 +24,7 @@ export function ResourceLibraryPanel({
   onTranslationChange,
   onScripturePreview,
   onScriptureGoLive,
+  onScriptureProject,
   onMediaPreview,
   onMediaGoLive,
   onSongPreview,
@@ -67,6 +69,7 @@ export function ResourceLibraryPanel({
             onTranslationChange={onTranslationChange}
             onPreview={onScripturePreview}
             onGoLive={onScriptureGoLive}
+            onProjectPassage={onScriptureProject}
           />
         ) : activeTab === 'media' ? (
           <MediaBrowser onPreview={onMediaPreview} onGoLive={onMediaGoLive} />

@@ -102,10 +102,19 @@ export interface TranscriptionUpdate {
   timestamp: string;
 }
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3001';
+/** Backend URL; output pages on other machines can pass `?api=http://main-pc:3001`. */
+export function getApiBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const fromQuery = new URLSearchParams(window.location.search).get('api');
+    if (fromQuery?.trim()) {
+      return fromQuery.trim().replace(/\/$/, '');
+    }
+  }
+  return import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3001';
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -138,10 +147,10 @@ export const backendApi = {
       method: 'POST',
       body: JSON.stringify({}),
     }),
-  projectScripture: (reference?: string) =>
+  projectScripture: (reference?: string, translation?: string) =>
     request<PresentationState>('/presentation/project-scripture', {
       method: 'POST',
-      body: JSON.stringify({ reference }),
+      body: JSON.stringify({ reference, translation }),
     }),
   getServiceFlow: () => request<ServiceFlowState>('/service-flow'),
   addServiceItem: (item: {
@@ -260,7 +269,7 @@ export function connectRealtime(handlers: {
   onConnected?: () => void;
   onDisconnected?: () => void;
 }): Socket {
-  const socket = io(API_BASE_URL, {
+  const socket = io(getApiBaseUrl(), {
     transports: ['websocket', 'polling'],
   });
 
