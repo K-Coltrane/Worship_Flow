@@ -62,7 +62,7 @@ export class AiService {
 
   clearDetections(): { cleared: number } {
     const result = this.database.db.prepare(`DELETE FROM detected_scriptures`).run();
-    return { cleared: result.changes };
+    return { cleared: Number(result.changes) };
   }
 
   private processTranscription(
