@@ -19,7 +19,7 @@ export function KeyboardHints() {
     <>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-16 right-4 p-3 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-full shadow-lg border border-border transition-colors z-50"
+        className="fixed bottom-4 left-4 p-3 bg-[#333] hover:bg-[#444] text-[#ccc] rounded-full shadow-lg border border-[#444] transition-colors z-50"
         title="Keyboard Shortcuts"
       >
         <Keyboard size={20} />

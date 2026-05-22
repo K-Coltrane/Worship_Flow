@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
-import { ChevronRight, BookOpen, Mic } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BookOpen, Mic, X, Waves } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { backendApi, DetectedScripture, TranslationInfo } from '../lib/backend';
+import {
+  backendApi,
+  DetectedScripture,
+  ScriptureMatchType,
+  TranslationInfo,
+} from '../lib/backend';
+import { TranslationSearchPicker } from './TranslationSearchPicker';
 import type { SpeechRecognitionStatus } from '../hooks/useSpeechRecognition';
 
 interface RightPanelProps {
   isOpen: boolean;
+  onToggle: () => void;
   isMicActive: boolean;
   micStatus: SpeechRecognitionStatus;
   interimTranscript: string;
@@ -13,7 +20,21 @@ interface RightPanelProps {
   onTranslationChange: (translation: string) => void;
   transcriptLines: string[];
   detectedScriptures: DetectedScripture[];
+  onClearDetections: () => void;
   onScriptureToPreview: (scripture: DetectedScripture) => void;
+}
+
+function matchTypeLabel(type?: ScriptureMatchType): string {
+  switch (type) {
+    case 'reference':
+      return 'Reference spoken';
+    case 'quote':
+      return 'Verse quoted';
+    case 'keyword':
+      return 'Keyword match';
+    default:
+      return 'Detected';
+  }
 }
 
 function micStatusMessage(
@@ -21,11 +42,11 @@ function micStatusMessage(
   micStatus: SpeechRecognitionStatus,
 ): string {
   if (!isMicActive) {
-    return 'Microphone inactive — click the mic in the top bar to listen.';
+    return 'Microphone inactive — click the mic in the toolbar to listen.';
   }
   switch (micStatus) {
     case 'listening':
-      return 'Listening… speak naturally (e.g. “turn to John chapter 3 verse 16”).';
+      return 'Listening… scripture matching starts as soon as words appear.';
     case 'unsupported':
       return 'Speech recognition is not supported in this browser. Use Chrome or Edge.';
     case 'denied':
@@ -39,6 +60,7 @@ function micStatusMessage(
 
 export function RightPanel({
   isOpen,
+  onToggle,
   isMicActive,
   micStatus,
   interimTranscript,
@@ -46,6 +68,7 @@ export function RightPanel({
   onTranslationChange,
   transcriptLines,
   detectedScriptures,
+  onClearDetections,
   onScriptureToPreview,
 }: RightPanelProps) {
   const [translations, setTranslations] = useState<TranslationInfo[]>([]);
@@ -55,142 +78,178 @@ export function RightPanel({
   }, []);
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ width: 0, opacity: 0 }}
-          animate={{ width: 360, opacity: 1 }}
-          exit={{ width: 0, opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="bg-card border-l border-border flex flex-col overflow-hidden min-h-0 min-w-0"
-        >
-          <motion.div className="p-4 border-b border-border shrink-0">
-            <motion.div className="flex items-center gap-2 mb-2">
-              <motion.div
-                className={`w-3 h-3 rounded-full ${isMicActive && micStatus === 'listening' ? 'bg-red-500 animate-pulse' : 'bg-muted-foreground'}`}
-              />
-              <h2 className="text-foreground font-semibold">AI Assistant</h2>
-            </motion.div>
-            <p className="text-muted-foreground text-sm">{micStatusMessage(isMicActive, micStatus)}</p>
-          <div className="mt-3 space-y-1">
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Project scriptures in
-          </label>
-          <select
-            value={preferredTranslation}
-            onChange={(e) => onTranslationChange(e.target.value)}
-            className="w-full py-2 px-3 bg-muted border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+    <div className="relative shrink-0 flex h-full min-h-0">
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.aside
+            key="ai-panel"
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 340, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{ duration: 0.18, ease: 'easeInOut' }}
+            className="h-full bg-[#1e1e1e] border-l border-[#3a3a3a] flex flex-col overflow-hidden min-h-0"
           >
-            {(translations.length > 0
-              ? translations
-              : [{ code: 'KJV', label: 'King James Version', language: 'English', verseCount: 0 }]
-            ).map((t) => (
-              <option key={t.code} value={t.code}>
-                {t.language} — {t.label}
-              </option>
-            ))}
-          </select>
-        </div>
-          </motion.div>
+            <div className="p-3 border-b border-[#3a3a3a] shrink-0 flex items-start gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <div
+                    className={`w-2.5 h-2.5 rounded-full ${isMicActive && micStatus === 'listening' ? 'bg-red-500 animate-pulse' : 'bg-[#666]'}`}
+                  />
+                  <h2 className="text-[#e0e0e0] font-semibold text-sm">AI Transcription</h2>
+                </div>
+                <p className="text-[#888] text-xs leading-relaxed">
+                  {micStatusMessage(isMicActive, micStatus)}
+                </p>
+                <div className="mt-2">
+                  <TranslationSearchPicker
+                    translations={translations}
+                    value={preferredTranslation}
+                    onChange={onTranslationChange}
+                    label="Project scriptures in"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onToggle}
+                className="p-1.5 rounded text-[#888] hover:text-[#e0e0e0] hover:bg-[#333] shrink-0"
+                title="Collapse AI panel (Ctrl+A)"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
 
-          <motion.div className="flex-1 flex flex-col overflow-hidden min-h-0">
-            <motion.div className="flex-1 overflow-y-auto min-h-0 p-4 border-b border-border">
-              <motion.div className="flex items-center gap-2 mb-3">
-                <Mic size={16} className="text-muted-foreground" />
-                <h3 className="text-foreground font-semibold text-sm">Live Transcription</h3>
-              </motion.div>
-              <motion.div className="space-y-2 text-sm">
-                {transcriptLines.length === 0 && !interimTranscript ? (
-                  <p className="text-muted-foreground italic">Waiting for speech...</p>
-                ) : (
-                  <>
-                    {transcriptLines.map((line, i) => (
-                      <motion.p
-                        key={`${i}-${line.slice(0, 12)}`}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-foreground/90 leading-relaxed"
-                      >
-                        {line}
-                      </motion.p>
-                    ))}
-                    {interimTranscript && (
-                      <p className="text-muted-foreground italic leading-relaxed">{interimTranscript}…</p>
-                    )}
-                  </>
-                )}
-              </motion.div>
-            </motion.div>
+            <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+              <div className="flex-1 overflow-y-auto min-h-0 p-3 border-b border-[#3a3a3a]">
+                <div className="flex items-center gap-2 mb-2">
+                  <Mic size={14} className="text-[#888]" />
+                  <h3 className="text-[#ccc] font-semibold text-xs">Live Transcription</h3>
+                </div>
+                <div className="space-y-2 text-sm">
+                  {transcriptLines.length === 0 && !interimTranscript ? (
+                    <p className="text-[#666] italic text-xs">Waiting for speech...</p>
+                  ) : (
+                    <>
+                      {transcriptLines.map((line, i) => (
+                        <p key={`${i}-${line.slice(0, 12)}`} className="text-[#d0d0d0] text-xs leading-relaxed">
+                          {line}
+                        </p>
+                      ))}
+                      {interimTranscript && (
+                        <p className="text-[#888] italic text-xs leading-relaxed">
+                          {interimTranscript}…
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
 
-            <motion.div className="flex-1 overflow-y-auto min-h-0 p-4">
-              <motion.div className="flex items-center justify-between mb-3 gap-2">
-                <motion.div className="flex items-center gap-2 min-w-0">
-                  <BookOpen size={16} className="text-muted-foreground shrink-0" />
-                  <h3 className="text-foreground font-semibold text-sm truncate">Detected Scriptures</h3>
-                </motion.div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    detectedScriptures.length > 0 && onScriptureToPreview(detectedScriptures[0])
-                  }
-                  disabled={detectedScriptures.length === 0}
-                  className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed text-white text-xs font-semibold rounded transition-colors shrink-0"
-                  title="Load latest to preview"
-                >
-                  Preview Latest
-                </button>
-              </motion.div>
-              <motion.div className="space-y-2">
-                {detectedScriptures.length === 0 ? (
-                  <p className="text-muted-foreground text-sm italic">
-                    Speak a reference (e.g. John 3:16) or quote a verse — matches are checked
-                    against every imported Bible translation.
-                  </p>
-                ) : (
-                  detectedScriptures.map((scripture) => (
-                    <motion.div
-                      key={scripture.id}
-                      className="p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors group cursor-pointer"
-                      onClick={() => onScriptureToPreview(scripture)}
+              <div className="flex-1 overflow-y-auto min-h-0 p-3">
+                <div className="flex items-center justify-between mb-2 gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <BookOpen size={14} className="text-[#888] shrink-0" />
+                    <h3 className="text-[#ccc] font-semibold text-xs truncate">Detected Scriptures</h3>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={onClearDetections}
+                      disabled={detectedScriptures.length === 0}
+                      className="px-2 py-1 border border-[#444] hover:bg-[#333] disabled:opacity-40 text-[#ccc] text-[10px] font-medium rounded flex items-center gap-1"
                     >
-                      <motion.div className="flex items-start justify-between gap-2">
-                        <motion.div className="flex-1 min-w-0">
-                          <motion.div className="text-foreground font-medium mb-1">{scripture.reference}</motion.div>
-                          <motion.div className="text-muted-foreground text-xs">
-                            {scripture.timestamp} • Click to preview ({preferredTranslation})
-                          </motion.div>
-                        </motion.div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onScriptureToPreview(scripture);
-                          }}
-                          className="p-1.5 bg-yellow-600 hover:bg-yellow-700 rounded opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                          title="Load to preview"
-                        >
-                          <ChevronRight size={14} className="text-white" />
-                        </button>
-                      </motion.div>
-                      <motion.div className="mt-2 flex items-center gap-1">
-                        <motion.div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
-                          <motion.div
-                            className="h-full bg-green-500 rounded-full"
-                            style={{ width: `${scripture.confidence * 100}%` }}
-                          />
-                        </motion.div>
-                        <span className="text-muted-foreground text-xs">
-                          {Math.round(scripture.confidence * 100)}%
-                        </span>
-                      </motion.div>
-                    </motion.div>
-                  ))
-                )}
-              </motion.div>
-            </motion.div>
-          </motion.div>
-        </motion.div>
+                      <X size={10} />
+                      Clear
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        detectedScriptures.length > 0 && onScriptureToPreview(detectedScriptures[0])
+                      }
+                      disabled={detectedScriptures.length === 0}
+                      className="px-2 py-1 bg-amber-700 hover:bg-amber-600 disabled:bg-[#333] disabled:text-[#666] text-white text-[10px] font-semibold rounded"
+                    >
+                      Preview
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  {detectedScriptures.length === 0 ? (
+                    <p className="text-[#666] text-xs italic leading-relaxed">
+                      Speak a reference or quote — Lumina matches against imported translations.
+                    </p>
+                  ) : (
+                    detectedScriptures.map((scripture) => (
+                      <div
+                        key={`${scripture.id}-${scripture.matchedTranslation ?? 'x'}`}
+                        className="p-2.5 bg-[#2a2a2a] rounded hover:bg-[#333] transition-colors group cursor-pointer"
+                        onClick={() => onScriptureToPreview(scripture)}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[#e0e0e0] font-medium text-xs mb-0.5">
+                              {scripture.reference}
+                            </div>
+                            <div className="text-[#888] text-[10px] flex flex-wrap gap-x-1">
+                              <span>{scripture.matchedTranslation ?? preferredTranslation}</span>
+                              <span>•</span>
+                              <span>{matchTypeLabel(scripture.matchType)}</span>
+                            </div>
+                            {scripture.verseText ? (
+                              <p className="text-[#888] text-[10px] mt-1 line-clamp-2 leading-relaxed">
+                                {scripture.verseText}
+                              </p>
+                            ) : null}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onScriptureToPreview(scripture);
+                            }}
+                            className="p-1 bg-amber-700 hover:bg-amber-600 rounded opacity-0 group-hover:opacity-100 shrink-0"
+                          >
+                            <ChevronRight size={12} className="text-white" />
+                          </button>
+                        </div>
+                        <div className="mt-1.5 flex items-center gap-1">
+                          <div className="flex-1 h-0.5 bg-[#444] rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-green-600 rounded-full"
+                              style={{ width: `${scripture.confidence * 100}%` }}
+                            />
+                          </div>
+                          <span className="text-[#888] text-[10px]">
+                            {Math.round(scripture.confidence * 100)}%
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
+      {!isOpen && (
+        <button
+          type="button"
+          onClick={onToggle}
+          className="w-8 h-full flex flex-col items-center justify-center gap-2 bg-[#252525] border-l border-[#3a3a3a] hover:bg-[#2f2f2f] text-[#888] hover:text-[#ccc] transition-colors"
+          title="Expand AI panel (Ctrl+A)"
+        >
+          <Waves size={16} className="text-purple-400" />
+          <span
+            className="text-[10px] font-semibold tracking-wider"
+            style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
+          >
+            AI
+          </span>
+          <ChevronLeft size={14} />
+        </button>
       )}
-    </AnimatePresence>
+    </div>
   );
 }

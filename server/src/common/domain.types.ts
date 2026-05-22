@@ -59,9 +59,14 @@ export interface ServiceFlowItem {
   updatedAt: string;
 }
 
+export type ScriptureMatchType = 'reference' | 'quote' | 'keyword';
+
 export interface DetectedScripture extends ScriptureReference {
   id: string;
   confidence: number;
   sourceText: string;
   timestamp: string;
+  matchedTranslation?: string;
+  verseText?: string;
+  matchType?: ScriptureMatchType;
 }

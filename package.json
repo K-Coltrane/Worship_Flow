@@ -10,7 +10,9 @@
     "backend:build": "tsc -p tsconfig.backend.json && node server/scripts/write-dist-package.cjs",
     "backend:start": "node server/dist/main.js",
     "backend:test": "TS_NODE_PROJECT=tsconfig.backend.json node -r ts-node/register server/test/backend.spec.ts",
-    "scripture:seed": "TS_NODE_PROJECT=tsconfig.backend.json node -r ts-node/register server/scripts/seed-scriptures.ts"
+    "scripture:seed": "TS_NODE_PROJECT=tsconfig.backend.json node -r ts-node/register server/scripts/seed-scriptures.ts",
+    "scripture:seed:popular": "SCRIPTURE_TRANSLATIONS=MSG,AMP,AMPC,NLT,NIV,ESV,NKJV,NASB,CSB,HCSB,KJV TS_NODE_PROJECT=tsconfig.backend.json node -r ts-node/register server/scripts/seed-scriptures.ts",
+    "scripture:seed:all": "SCRIPTURE_TRANSLATIONS=MSG,AMP,AMPC,NLT,NIV,ESV,NKJV,NASB,CSB,HCSB,KJV,MEV,LSB,NRSV,RSV,CEV,NCV,NIRV,GNT,TLB,ISV,PHILLIPS TS_NODE_PROJECT=tsconfig.backend.json node -r ts-node/register server/scripts/seed-scriptures.ts"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",

@@ -1,13 +1,20 @@
 type SlidePayload = {
   mediaUrl?: string;
   type?: string;
+  segmentLabel?: string;
 };
 
 export function SlideContent({
   slide,
   className = '',
 }: {
-  slide: { type?: string; title?: string; content?: string; payload?: SlidePayload };
+  slide: {
+    type?: string;
+    title?: string;
+    subtitle?: string;
+    content?: string;
+    payload?: SlidePayload;
+  };
   className?: string;
 }) {
   const mediaUrl = slide.payload?.mediaUrl;
@@ -45,9 +52,18 @@ export function SlideContent({
     }
   }
 
+  const segmentLabel =
+    typeof slide.payload?.segmentLabel === 'string' ? slide.payload.segmentLabel : undefined;
+
   return (
     <div className={`text-center ${className}`}>
-      <h2 className="text-4xl text-foreground font-bold mb-4">{slide.title}</h2>
+      <h2 className="text-4xl text-foreground font-bold mb-2">{slide.title}</h2>
+      {segmentLabel && (
+        <p className="text-lg text-foreground/60 mb-4">{segmentLabel}</p>
+      )}
+      {slide.subtitle && !segmentLabel && (
+        <p className="text-lg text-foreground/60 mb-4">{slide.subtitle}</p>
+      )}
       {slide.content && (
         <p className="text-2xl text-foreground/90 leading-relaxed whitespace-pre-line">
           {slide.content}

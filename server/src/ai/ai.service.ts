@@ -18,6 +18,9 @@ type DetectedScriptureRow = {
   confidence: number;
   source_text: string;
   created_at: string;
+  matched_translation: string | null;
+  verse_text: string | null;
+  match_type: string | null;
 };
 
 @Injectable()
@@ -57,6 +60,11 @@ export class AiService {
     return rows.map((row) => this.mapDetection(row));
   }
 
+  clearDetections(): { cleared: number } {
+    const result = this.database.db.prepare(`DELETE FROM detected_scriptures`).run();
+    return { cleared: result.changes };
+  }
+
   private processTranscription(
     transcription: TranscriptionResult,
     source: string,
@@ -78,23 +86,33 @@ export class AiService {
       const detections = transcription.text
         ? this.scriptureService
             .detectFromSpeech(transcription.text, translation)
-            .map((reference) =>
+            .map((match) =>
               persist
                 ? this.storeDetection({
-                    ...reference,
-                    confidence: Math.min(reference.confidence, transcription.confidence),
+                    reference: match.reference,
+                    book: match.book,
+                    chapter: match.chapter,
+                    verseStart: match.verseStart,
+                    verseEnd: match.verseEnd,
+                    confidence: Math.min(match.confidence, transcription.confidence),
                     sourceText: transcription.text,
+                    matchedTranslation: match.matchedTranslation,
+                    verseText: match.verseText,
+                    matchType: match.matchType,
                   })
                 : {
-                    id: `ephemeral-${reference.reference}`,
-                    reference: reference.reference,
-                    book: reference.book,
-                    chapter: reference.chapter,
-                    verseStart: reference.verseStart,
-                    verseEnd: reference.verseEnd,
-                    confidence: Math.min(reference.confidence, transcription.confidence),
+                    id: `ephemeral-${match.reference}-${match.matchedTranslation}`,
+                    reference: match.reference,
+                    book: match.book,
+                    chapter: match.chapter,
+                    verseStart: match.verseStart,
+                    verseEnd: match.verseEnd,
+                    confidence: Math.min(match.confidence, transcription.confidence),
                     sourceText: transcription.text,
-                    timestamp: timestamp,
+                    timestamp,
+                    matchedTranslation: match.matchedTranslation,
+                    verseText: match.verseText,
+                    matchType: match.matchType,
                   },
             )
         : [];
@@ -125,6 +143,9 @@ export class AiService {
     verseEnd?: number;
     confidence: number;
     sourceText: string;
+    matchedTranslation?: string;
+    verseText?: string;
+    matchType?: string;
   }): DetectedScripture {
     const detection: DetectedScripture = {
       id: randomUUID(),
@@ -136,13 +157,17 @@ export class AiService {
       confidence: input.confidence,
       sourceText: input.sourceText,
       timestamp: nowIso(),
+      matchedTranslation: input.matchedTranslation,
+      verseText: input.verseText,
+      matchType: input.matchType as DetectedScripture['matchType'],
     };
 
     this.database.db
       .prepare(
         `INSERT INTO detected_scriptures
-          (id, reference, book, chapter, verse_start, verse_end, confidence, source_text, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (id, reference, book, chapter, verse_start, verse_end, confidence, source_text, created_at,
+           matched_translation, verse_text, match_type)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         detection.id,
@@ -154,6 +179,9 @@ export class AiService {
         detection.confidence,
         detection.sourceText,
         detection.timestamp,
+        detection.matchedTranslation ?? null,
+        detection.verseText ?? null,
+        detection.matchType ?? null,
       );
 
     return detection;
@@ -170,6 +198,9 @@ export class AiService {
       confidence: row.confidence,
       sourceText: row.source_text,
       timestamp: row.created_at,
+      matchedTranslation: row.matched_translation ?? undefined,
+      verseText: row.verse_text ?? undefined,
+      matchType: (row.match_type as DetectedScripture['matchType']) ?? undefined,
     };
   }
 }

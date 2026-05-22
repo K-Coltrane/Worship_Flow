@@ -57,6 +57,8 @@ export interface ScriptureVerse {
   translation: string;
 }
 
+export type ScriptureMatchType = 'reference' | 'quote' | 'keyword';
+
 export interface DetectedScripture {
   id: string;
   reference: string;
@@ -67,6 +69,9 @@ export interface DetectedScripture {
   timestamp: string;
   confidence: number;
   sourceText?: string;
+  matchedTranslation?: string;
+  verseText?: string;
+  matchType?: ScriptureMatchType;
 }
 
 export interface ScriptureLibraryItem extends ScriptureVerse {
@@ -161,6 +166,32 @@ export const backendApi = {
       body: JSON.stringify({}),
     }),
   searchSongs: (query = '') => request<Song[]>(`/songs?q=${encodeURIComponent(query)}`),
+  getSong: (id: string) => request<Song>(`/songs/${id}`),
+  createSong: (input: {
+    title: string;
+    artist?: string;
+    defaultKey?: string;
+    verses: SongSegment[];
+  }) =>
+    request<Song>('/songs', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  updateSong: (
+    id: string,
+    input: {
+      title?: string;
+      artist?: string;
+      defaultKey?: string;
+      verses?: SongSegment[];
+    },
+  ) =>
+    request<Song>(`/songs/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
+  deleteSong: (id: string) =>
+    request<{ deleted: boolean }>(`/songs/${id}`, { method: 'DELETE' }),
   listTranslations: () => request<TranslationInfo[]>('/scripture/translations'),
   listBibleBooks: (translation = 'KJV') =>
     request<BibleBookInfo[]>(
@@ -197,6 +228,12 @@ export const backendApi = {
     request<PresentationContent>(
       `/scripture/passage?reference=${encodeURIComponent(reference)}&translation=${encodeURIComponent(translation)}`,
     ),
+  /** Live mic scan — searches all imported Bibles, no DB write. */
+  detectSpeech: (text: string, translation = 'NLT') =>
+    request<DetectedScripture[]>('/scripture/detect-speech', {
+      method: 'POST',
+      body: JSON.stringify({ text, translation }),
+    }),
   processTranscription: (
     text: string,
     translation = 'KJV',
@@ -211,6 +248,8 @@ export const backendApi = {
       },
     ),
   listDetections: () => request<DetectedScripture[]>('/ai/scripture-detections'),
+  clearDetections: () =>
+    request<{ cleared: number }>('/ai/scripture-detections', { method: 'DELETE' }),
 };
 
 export function connectRealtime(handlers: {
@@ -235,6 +274,32 @@ export function connectRealtime(handlers: {
   return socket;
 }
 
+export function songSegmentToPresentationContent(
+  song: Song,
+  segment: SongSegment,
+  segmentIndex: number,
+): PresentationContent {
+  const segmentLabel =
+    segment.label?.trim() ||
+    segment.type.charAt(0).toUpperCase() + segment.type.slice(1);
+  return {
+    id: `song:${song.id}:${segmentIndex}`,
+    type: 'song',
+    title: song.title,
+    subtitle: [song.artist, segmentLabel].filter(Boolean).join(' · '),
+    content: segment.content,
+    payload: {
+      songId: song.id,
+      segmentIndex,
+      segmentType: segment.type,
+      segmentLabel,
+      defaultKey: song.defaultKey,
+      verses: song.verses,
+    },
+  };
+}
+
+/** Full song as one slide (all segments combined). */
 export function songToPresentationContent(song: Song): PresentationContent {
   return {
     id: `song:${song.id}`,

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, Query } from '@nestjs/common';
 import { AiService } from './ai.service';
 import { AudioInputDto, TranscriptionInputDto } from './ai.dto';
 
@@ -29,5 +29,10 @@ export class AiController {
   @Get('scripture-detections/latest')
   getLatestDetection() {
     return this.aiService.getLatestDetection();
+  }
+
+  @Delete('scripture-detections')
+  clearDetections() {
+    return this.aiService.clearDetections();
   }
 }

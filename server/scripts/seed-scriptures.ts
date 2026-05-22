@@ -3,6 +3,13 @@ import { DatabaseService } from '../src/database/database.service';
 import { ScriptureImportService } from '../src/scripture/scripture-import.service';
 
 async function main() {
+  const configured = process.env.SCRIPTURE_TRANSLATIONS?.split(',').map((t) => t.trim());
+  console.log(
+    configured?.length
+      ? `Seeding translations: ${configured.join(', ')}`
+      : 'Seeding default popular translations (MSG, AMP, NLT, NIV, ESV, …)',
+  );
+
   const database = new DatabaseService();
   database.onModuleInit();
 

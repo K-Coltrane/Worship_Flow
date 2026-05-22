@@ -106,9 +106,14 @@ export class DatabaseService implements OnModuleInit, OnApplicationShutdown {
         verse_end INTEGER,
         confidence REAL NOT NULL,
         source_text TEXT NOT NULL,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        matched_translation TEXT,
+        verse_text TEXT,
+        match_type TEXT
       );
     `);
+
+    this.ensureDetectedScriptureColumns();
 
     this.db
       .prepare(
@@ -123,6 +128,22 @@ export class DatabaseService implements OnModuleInit, OnApplicationShutdown {
          VALUES ('singleton', NULL, ?)`,
       )
       .run(nowIso());
+  }
+
+  private ensureDetectedScriptureColumns(): void {
+    const columns = this.db.prepare('PRAGMA table_info(detected_scriptures)').all() as {
+      name: string;
+    }[];
+    const names = new Set(columns.map((column) => column.name));
+    if (!names.has('matched_translation')) {
+      this.db.exec(`ALTER TABLE detected_scriptures ADD COLUMN matched_translation TEXT`);
+    }
+    if (!names.has('verse_text')) {
+      this.db.exec(`ALTER TABLE detected_scriptures ADD COLUMN verse_text TEXT`);
+    }
+    if (!names.has('match_type')) {
+      this.db.exec(`ALTER TABLE detected_scriptures ADD COLUMN match_type TEXT`);
+    }
   }
 
   private seedOfflineContent(): void {

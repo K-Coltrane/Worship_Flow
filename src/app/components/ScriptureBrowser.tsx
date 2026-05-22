@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, Search } from 'lucide-react';
-import {
-  backendApi,
-  ScriptureLibraryItem,
-  TranslationInfo,
-} from '../lib/backend';
+import { backendApi, ScriptureLibraryItem, TranslationInfo } from '../lib/backend';
+import { TranslationSearchPicker } from './TranslationSearchPicker';
 
 type BrowseView = 'books' | 'chapters' | 'verses';
 
@@ -149,102 +146,47 @@ export function ScriptureBrowser({
     };
   }, [filteredBooks]);
 
-  const selectedTranslationMeta = translations.find((t) => t.code === preferredTranslation);
-
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="p-3 border-b border-border shrink-0 space-y-2">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Translation
-        </label>
-        <select
-          value={preferredTranslation}
-          onChange={(e) => {
-            onTranslationChange(e.target.value);
-            goToBooks();
-          }}
-          className="w-full py-2 px-3 bg-muted border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          {(translations.length > 0
-            ? translations
-            : [{ code: 'KJV', label: 'King James Version', language: 'English', verseCount: 0 }]
-          )
-            .sort((a, b) => {
-              if (a.language !== b.language) {
-                return a.language.localeCompare(b.language);
-              }
-              if (a.verseCount > 0 && b.verseCount === 0) return -1;
-              if (b.verseCount > 0 && a.verseCount === 0) return 1;
-              return a.label.localeCompare(b.label);
-            })
-            .map((t) => (
-              <option key={t.code} value={t.code}>
-                {t.label}
-                {t.verseCount > 0 ? ` (${(t.verseCount / 1000).toFixed(0)}k)` : ' — importing…'}
-              </option>
-            ))}
-        </select>
-        {selectedTranslationMeta && selectedTranslationMeta.verseCount === 0 && (
-          <p className="text-xs text-amber-600 dark:text-amber-400">
-            This translation is still downloading. Try KJV or run{' '}
-            <code className="text-[11px]">npm run scripture:seed</code>.
-          </p>
-        )}
-      </div>
-
-      <div className="px-3 py-2 border-b border-border shrink-0 flex items-center gap-1 text-sm min-w-0">
+      <div className="px-2 py-2 border-b border-[#3a3a3a] shrink-0 flex items-center gap-2 min-w-0">
         {view !== 'books' && (
           <button
             type="button"
             onClick={view === 'verses' ? goToChapters : goToBooks}
-            className="p-1 rounded hover:bg-muted text-muted-foreground shrink-0"
+            className="p-1.5 rounded hover:bg-[#333] text-[#888] shrink-0"
             aria-label="Back"
           >
             <ChevronLeft size={18} />
           </button>
         )}
-        <button
-          type="button"
-          onClick={goToBooks}
-          className={`truncate hover:underline ${view === 'books' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}
-        >
-          Bible
-        </button>
-        {selectedBook && (
-          <>
-            <span className="text-muted-foreground shrink-0">/</span>
-            <button
-              type="button"
-              onClick={goToChapters}
-              className={`truncate hover:underline max-w-[120px] ${view === 'chapters' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}
-            >
-              {selectedBook}
-            </button>
-          </>
-        )}
-        {selectedChapter !== null && view === 'verses' && (
-          <>
-            <span className="text-muted-foreground shrink-0">/</span>
-            <span className="text-foreground font-medium shrink-0">{selectedChapter}</span>
-          </>
-        )}
-      </div>
-
-      <div className="p-3 border-b border-border shrink-0">
-        <div className="relative flex gap-2">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+        <TranslationSearchPicker
+          translations={translations}
+          value={preferredTranslation}
+          onChange={(code) => {
+            onTranslationChange(code);
+            goToBooks();
+          }}
+          label=""
+          tone="toolbar"
+          className="flex-1 min-w-0"
+        />
+        <div className="relative flex flex-1 min-w-0 gap-1.5">
+          <Search
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#666] pointer-events-none"
+            size={16}
+          />
           <input
             type="text"
-            placeholder="Jump: Genesis 1 or John 3:16…"
+            placeholder="Genesis 1 or John 3:16…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
-            className="flex-1 pl-9 pr-3 py-2 bg-muted border border-border rounded-lg text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 min-w-0 pl-8 pr-2 py-2 bg-[#2a2a2a] border border-[#444] rounded text-[#e0e0e0] text-sm placeholder:text-[#666] focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
           <button
             type="button"
             onClick={handleSearchSubmit}
-            className="px-3 py-2 bg-secondary hover:bg-secondary/80 rounded-lg text-sm font-medium shrink-0"
+            className="px-3 py-2 bg-[#333] hover:bg-[#444] rounded text-sm font-medium text-[#ccc] shrink-0"
           >
             Go
           </button>

@@ -6,18 +6,41 @@ interface UseSpeechRecognitionOptions {
   enabled: boolean;
   onFinalTranscript: (text: string) => void;
   onInterimTranscript?: (text: string) => void;
+  /** Called whenever speech changes — full session text (finalized + current interim). */
+  onLiveTranscript?: (fullText: string, interimOnly: string) => void;
+  /** Fires as soon as the browser detects voice (before full words are recognized). */
+  onSpeechStart?: () => void;
 }
 
 export function useSpeechRecognition({
   enabled,
   onFinalTranscript,
   onInterimTranscript,
+  onLiveTranscript,
+  onSpeechStart,
 }: UseSpeechRecognitionOptions) {
   const [status, setStatus] = useState<SpeechRecognitionStatus>('idle');
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const callbacksRef = useRef({ onFinalTranscript, onInterimTranscript });
+  const callbacksRef = useRef({
+    onFinalTranscript,
+    onInterimTranscript,
+    onLiveTranscript,
+    onSpeechStart,
+  });
+  const finalizedRef = useRef('');
 
-  callbacksRef.current = { onFinalTranscript, onInterimTranscript };
+  callbacksRef.current = {
+    onFinalTranscript,
+    onInterimTranscript,
+    onLiveTranscript,
+    onSpeechStart,
+  };
+
+  useEffect(() => {
+    if (!enabled) {
+      finalizedRef.current = '';
+    }
+  }, [enabled]);
 
   useEffect(() => {
     const SpeechRecognitionCtor =
@@ -35,6 +58,8 @@ export function useSpeechRecognition({
       return;
     }
 
+    finalizedRef.current = '';
+
     const recognition = new SpeechRecognitionCtor();
     recognition.continuous = true;
     recognition.interimResults = true;
@@ -42,6 +67,10 @@ export function useSpeechRecognition({
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => setStatus('listening');
+
+    recognition.onspeechstart = () => {
+      callbacksRef.current.onSpeechStart?.();
+    };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interim = '';
@@ -60,8 +89,18 @@ export function useSpeechRecognition({
         }
       }
 
-      if (interim.trim()) {
-        callbacksRef.current.onInterimTranscript?.(interim.trim());
+      const interimTrimmed = interim.trim();
+      if (finalText.trim()) {
+        finalizedRef.current = `${finalizedRef.current} ${finalText}`.replace(/\s+/g, ' ').trim();
+      }
+
+      const fullText = [finalizedRef.current, interimTrimmed].filter(Boolean).join(' ').trim();
+
+      if (interimTrimmed) {
+        callbacksRef.current.onInterimTranscript?.(interimTrimmed);
+        callbacksRef.current.onLiveTranscript?.(fullText || interimTrimmed, interimTrimmed);
+      } else if (fullText) {
+        callbacksRef.current.onLiveTranscript?.(fullText, '');
       }
 
       if (finalText.trim()) {

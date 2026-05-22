@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { TopBar } from './components/TopBar';
-import { LeftPanel } from './components/LeftPanel';
+import { SchedulePanel } from './components/SchedulePanel';
 import { CenterPanel } from './components/CenterPanel';
 import { RightPanel } from './components/RightPanel';
-import { BottomPanel } from './components/BottomPanel';
+import { ResourceLibraryPanel } from './components/ResourceLibraryPanel';
 import { KeyboardHints } from './components/KeyboardHints';
 import { QuickHints } from './components/QuickHints';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
@@ -19,7 +19,8 @@ import {
   PresentationState,
   scriptureToPresentationContent,
   ServiceFlowItem,
-  songToPresentationContent,
+  Song,
+  songSegmentToPresentationContent,
 } from './lib/backend';
 
 const emptyPresentation: PresentationState = {
@@ -27,6 +28,15 @@ const emptyPresentation: PresentationState = {
   live: null,
   updatedAt: new Date(0).toISOString(),
 };
+
+function extractRecentPhrase(text: string, wordCount = 14): string {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  return words.slice(-wordCount).join(' ');
+}
+
+function detectionKey(scripture: DetectedScripture): string {
+  return `${scripture.reference}|${scripture.matchedTranslation ?? ''}`;
+}
 
 export default function App() {
   const [isAIOpen, setIsAIOpen] = useState(true);
@@ -39,9 +49,12 @@ export default function App() {
   const [backendStatus, setBackendStatus] = useState<'connecting' | 'connected' | 'offline'>(
     'connecting',
   );
-  const [preferredTranslation, setPreferredTranslation] = useState('KJV');
+  const [preferredTranslation, setPreferredTranslation] = useState('NLT');
   const [interimTranscript, setInterimTranscript] = useState('');
-  const lastInterimDetectionRef = useRef('');
+  const [liveTranscript, setLiveTranscript] = useState('');
+  const lastDetectionTextRef = useRef('');
+  const detectionInFlightRef = useRef(false);
+  const pendingDetectionPhraseRef = useRef<string | null>(null);
 
   const mergeDetections = useCallback((incoming: DetectedScripture[]) => {
     if (incoming.length === 0) {
@@ -50,7 +63,7 @@ export default function App() {
     setDetectedScriptures((current) => {
       const merged = [...incoming];
       for (const item of current) {
-        if (!merged.some((d) => d.id === item.id || d.reference === item.reference)) {
+        if (!merged.some((d) => detectionKey(d) === detectionKey(item))) {
           merged.push(item);
         }
       }
@@ -59,18 +72,39 @@ export default function App() {
   }, []);
 
   const runSpeechDetection = useCallback(
-    (text: string, persist: boolean) => {
-      const trimmed = text.trim();
-      if (trimmed.length < 8) {
+    (phrase: string, scope: 'live' | 'full' = 'live') => {
+      const trimmed = phrase.trim();
+      const cacheKey = `${scope}:${trimmed}`;
+      if (trimmed.length < 3 || cacheKey === lastDetectionTextRef.current) {
         return;
       }
-      backendApi
-        .processTranscription(trimmed, preferredTranslation, 'microphone', persist)
-        .then(({ detections }) => mergeDetections(detections))
-        .catch((error) => {
-          console.error(error);
-          setBackendStatus('offline');
-        });
+
+      const execute = () => {
+        lastDetectionTextRef.current = cacheKey;
+        detectionInFlightRef.current = true;
+        backendApi
+          .detectSpeech(trimmed, preferredTranslation)
+          .then((detections) => mergeDetections(detections))
+          .catch((error) => {
+            console.error(error);
+            setBackendStatus('offline');
+          })
+          .finally(() => {
+            detectionInFlightRef.current = false;
+            const pending = pendingDetectionPhraseRef.current;
+            pendingDetectionPhraseRef.current = null;
+            if (pending && pending !== lastDetectionTextRef.current) {
+              runSpeechDetection(pending, scope);
+            }
+          });
+      };
+
+      if (detectionInFlightRef.current) {
+        pendingDetectionPhraseRef.current = trimmed;
+        return;
+      }
+
+      execute();
     },
     [mergeDetections, preferredTranslation],
   );
@@ -78,33 +112,43 @@ export default function App() {
   const handleFinalTranscript = useCallback(
     (text: string) => {
       setInterimTranscript('');
-      lastInterimDetectionRef.current = '';
       setTranscriptLines((current) => [...current.slice(-20), text]);
-      runSpeechDetection(text, true);
+      runSpeechDetection(text, 'full');
     },
     [runSpeechDetection],
+  );
+
+  const handleLiveTranscript = useCallback(
+    (fullText: string, interimOnly: string) => {
+      setLiveTranscript(fullText);
+      setInterimTranscript(interimOnly);
+      if (!isMicActive) {
+        return;
+      }
+      const livePhrase =
+        interimOnly.trim() || extractRecentPhrase(fullText, 14) || fullText.trim();
+      if (livePhrase) {
+        runSpeechDetection(livePhrase, 'live');
+      }
+    },
+    [isMicActive, runSpeechDetection],
   );
 
   const { status: micStatus } = useSpeechRecognition({
     enabled: isMicActive,
     onFinalTranscript: handleFinalTranscript,
-    onInterimTranscript: setInterimTranscript,
+    onLiveTranscript: handleLiveTranscript,
   });
 
   useEffect(() => {
     if (!isMicActive) {
-      return;
+      setLiveTranscript('');
+      setInterimTranscript('');
+      lastDetectionTextRef.current = '';
+      pendingDetectionPhraseRef.current = null;
+      detectionInFlightRef.current = false;
     }
-    const trimmed = interimTranscript.trim();
-    if (trimmed.length < 20 || trimmed === lastInterimDetectionRef.current) {
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      lastInterimDetectionRef.current = trimmed;
-      runSpeechDetection(trimmed, false);
-    }, 800);
-    return () => window.clearTimeout(timer);
-  }, [interimTranscript, isMicActive, runSpeechDetection]);
+  }, [isMicActive]);
 
   const refreshBackendState = useCallback(async () => {
     const [flow, state, detections] = await Promise.all([
@@ -213,54 +257,19 @@ export default function App() {
     backendApi.projectScripture().then(setPresentation).catch(console.error);
   }, []);
 
-  const addItemToServiceFlow = useCallback(
-    async (item: any, type: string, shouldGoLive: boolean) => {
-      let content: PresentationContent;
-      let serviceType: 'song' | 'scripture' | 'media';
-      let subtitle: string | undefined;
-      let itemRef: string | undefined;
-
-      if (type === 'songs') {
-        content = songToPresentationContent(item);
-        serviceType = 'song';
-        subtitle = item.artist;
-        itemRef = item.id;
-      } else if (type === 'scriptures') {
-        content = scriptureToPresentationContent(item);
-        serviceType = 'scripture';
-        subtitle = item.translation;
-        itemRef = item.reference;
-      } else {
-        content = mediaToPresentationContent(item);
-        serviceType = 'media';
-        subtitle = item.type;
-        itemRef = item.id;
-      }
-
-      const created = await backendApi.addServiceItem({
-        type: serviceType,
-        title: content.title,
-        subtitle,
-        itemRef,
-        content,
-      });
-
-      await setActiveItem(created.id);
-
-      if (shouldGoLive) {
-        const state = await backendApi.goLive();
-        setPresentation(state);
-      }
-    },
-    [setActiveItem],
-  );
+  const handleClearDetections = useCallback(() => {
+    setDetectedScriptures([]);
+    lastDetectionTextRef.current = '';
+    pendingDetectionPhraseRef.current = null;
+    backendApi.clearDetections().catch((error) => {
+      console.error(error);
+    });
+  }, []);
 
   const handleScriptureToPreview = useCallback(
     async (scripture: DetectedScripture) => {
-      const content = await backendApi.getScriptureContent(
-        scripture.reference,
-        preferredTranslation,
-      );
+      const translation = scripture.matchedTranslation ?? preferredTranslation;
+      const content = await backendApi.getScriptureContent(scripture.reference, translation);
       const state = await backendApi.setPreview(content);
       setPresentation(state);
     },
@@ -298,6 +307,46 @@ export default function App() {
     const state = await backendApi.goLive();
     setPresentation(state);
   }, []);
+
+  const handleSongPreview = useCallback(async (song: Song, segmentIndex = 0) => {
+    const segment = song.verses[segmentIndex] ?? song.verses[0];
+    if (!segment) {
+      return;
+    }
+    const content = songSegmentToPresentationContent(song, segment, segmentIndex);
+    const state = await backendApi.setPreview(content);
+    setPresentation(state);
+  }, []);
+
+  const handleSongSchedule = useCallback(
+    async (song: Song, goLive: boolean) => {
+      let firstItemId: string | null = null;
+      for (let i = 0; i < song.verses.length; i++) {
+        const content = songSegmentToPresentationContent(song, song.verses[i], i);
+        const segmentLabel =
+          song.verses[i].label?.trim() ||
+          song.verses[i].type.charAt(0).toUpperCase() + song.verses[i].type.slice(1);
+        const created = await backendApi.addServiceItem({
+          type: 'song',
+          title: song.title,
+          subtitle: [song.artist, segmentLabel].filter(Boolean).join(' · '),
+          itemRef: `${song.id}:${i}`,
+          content,
+        });
+        if (i === 0) {
+          firstItemId = created.id;
+        }
+      }
+      if (firstItemId) {
+        await setActiveItem(firstItemId);
+      }
+      if (goLive) {
+        const state = await backendApi.goLive();
+        setPresentation(state);
+      }
+    },
+    [setActiveItem],
+  );
 
   const handleReorder = useCallback(
     (dragIndex: number, hoverIndex: number) => {
@@ -370,16 +419,18 @@ export default function App() {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="h-full w-full min-h-0 max-h-full flex flex-col bg-background text-foreground overflow-hidden">
+      <div className="h-full w-full min-h-0 max-h-full flex flex-col bg-[#1a1a1a] text-[#e0e0e0] overflow-hidden">
         <TopBar
           onNext={handleNext}
           onPrevious={handlePrevious}
           onClear={handleClear}
+          onGoLive={handleGoLive}
           onProjectScripture={handleProjectScripture}
           onToggleAI={() => setIsAIOpen(!isAIOpen)}
           onToggleMic={() => setIsMicActive(!isMicActive)}
           isAIOpen={isAIOpen}
           isMicActive={isMicActive}
+          hasPreview={!!previewSlide}
         />
 
         {backendStatus !== 'connected' && (
@@ -389,42 +440,59 @@ export default function App() {
         )}
 
         <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
-          <LeftPanel
-            preferredTranslation={preferredTranslation}
-            onTranslationChange={setPreferredTranslation}
-            onScripturePreview={(verse) => handleScriptureLibraryPreview(verse).catch(console.error)}
-            onScriptureGoLive={(verse) => handleScriptureLibraryGoLive(verse).catch(console.error)}
-            onMediaPreview={(item) => handleMediaPreview(item).catch(console.error)}
-            onMediaGoLive={(item) => handleMediaGoLive(item).catch(console.error)}
-            onItemSelect={(item, type) => addItemToServiceFlow(item, type, false).catch(console.error)}
-            onItemDoubleClick={(item, type) =>
-              addItemToServiceFlow(item, type, true).catch(console.error)
-            }
-          />
+          <div className="flex-1 flex flex-col min-w-0 min-h-0">
+            <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
+              <SchedulePanel
+                serviceItems={serviceItems}
+                previewItemId={previewItemId}
+                liveItemId={liveItemId}
+                onReorder={handleReorder}
+                onItemClick={handleItemClick}
+                onItemDoubleClick={handleItemDoubleClick}
+              />
+              <CenterPanel
+                previewSlide={previewSlide}
+                liveSlide={liveSlide}
+                onGoLive={handleGoLive}
+              />
+            </div>
 
-          <CenterPanel previewSlide={previewSlide} liveSlide={liveSlide} onGoLive={handleGoLive} />
+            <ResourceLibraryPanel
+              preferredTranslation={preferredTranslation}
+              onTranslationChange={setPreferredTranslation}
+              onScripturePreview={(verse) =>
+                handleScriptureLibraryPreview(verse).catch(console.error)
+              }
+              onScriptureGoLive={(verse) =>
+                handleScriptureLibraryGoLive(verse).catch(console.error)
+              }
+              onMediaPreview={(item) => handleMediaPreview(item).catch(console.error)}
+              onMediaGoLive={(item) => handleMediaGoLive(item).catch(console.error)}
+              onSongPreview={(song, segmentIndex) =>
+                handleSongPreview(song, segmentIndex).catch(console.error)
+              }
+              onSongSchedule={(song, goLive) =>
+                handleSongSchedule(song, goLive).catch(console.error)
+              }
+            />
+          </div>
 
           <RightPanel
             isOpen={isAIOpen}
+            onToggle={() => setIsAIOpen((current) => !current)}
             isMicActive={isMicActive}
             micStatus={micStatus}
-            interimTranscript={interimTranscript}
+            interimTranscript={liveTranscript || interimTranscript}
             preferredTranslation={preferredTranslation}
             onTranslationChange={setPreferredTranslation}
             transcriptLines={transcriptLines}
             detectedScriptures={detectedScriptures}
-            onScriptureToPreview={(scripture) => handleScriptureToPreview(scripture).catch(console.error)}
+            onClearDetections={handleClearDetections}
+            onScriptureToPreview={(scripture) =>
+              handleScriptureToPreview(scripture).catch(console.error)
+            }
           />
         </div>
-
-        <BottomPanel
-          serviceItems={serviceItems}
-          previewItemId={previewItemId}
-          liveItemId={liveItemId}
-          onReorder={handleReorder}
-          onItemClick={handleItemClick}
-          onItemDoubleClick={handleItemDoubleClick}
-        />
 
         <KeyboardHints />
         <QuickHints />

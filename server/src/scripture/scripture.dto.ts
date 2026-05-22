@@ -1,25 +1,8 @@
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
-export class GetVerseQueryDto {
+export class DetectSpeechDto {
   @IsString()
-  book!: string;
-
-  @IsInt()
-  @Min(1)
-  chapter!: number;
-
-  @IsInt()
-  @Min(1)
-  verse!: number;
-
-  @IsOptional()
-  @IsString()
-  translation?: string;
-}
-
-export class SearchScriptureQueryDto {
-  @IsString()
-  q!: string;
+  text!: string;
 
   @IsOptional()
   @IsString()

@@ -2,7 +2,13 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseService } from '../database/database.service';
-import { BIBLE_BOOK_NAMES, BIBLE_TRANSLATION_CATALOG, BibleTranslationEntry } from './bible-books';
+import {
+  BIBLE_BOOK_NAMES,
+  BIBLE_TRANSLATION_CATALOG,
+  BibleTranslationEntry,
+  DEFAULT_IMPORT_TRANSLATION_CODES,
+} from './bible-books';
+import { fetchBollsTranslation } from './bolls-import';
 import { parseHelloAoComplete } from './helloao-parser';
 
 const HELLOAO_API_BASE = 'https://bible.helloao.org/api';
@@ -45,7 +51,9 @@ export class ScriptureImportService implements OnModuleInit {
     const configured = process.env.SCRIPTURE_TRANSLATIONS?.split(',').map((t) => t.trim());
     const targets = (configured?.length
       ? BIBLE_TRANSLATION_CATALOG.filter((t) => configured.includes(t.code))
-      : [...BIBLE_TRANSLATION_CATALOG]
+      : BIBLE_TRANSLATION_CATALOG.filter((t) =>
+          (DEFAULT_IMPORT_TRANSLATION_CODES as readonly string[]).includes(t.code),
+        )
     ).sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
 
     for (const translation of targets) {
@@ -58,7 +66,9 @@ export class ScriptureImportService implements OnModuleInit {
         continue;
       }
 
-      if (translation.source === 'helloao' && translation.helloaoId) {
+      if (translation.source === 'bolls') {
+        await this.importBollsTranslation(translation);
+      } else if (translation.source === 'helloao' && translation.helloaoId) {
         await this.importHelloAoTranslation(translation);
       } else if (translation.file) {
         await this.importTranslation(translation.code, translation.file, translation.label);
@@ -118,6 +128,46 @@ export class ScriptureImportService implements OnModuleInit {
     });
 
     importBooks();
+    const count = this.database.db
+      .prepare('SELECT COUNT(*) AS count FROM scriptures WHERE translation = ?')
+      .get(code) as { count: number };
+    this.logger.log(`Imported ${count.count} verses for ${code} (${label})`);
+  }
+
+  async importBollsTranslation(translation: BibleTranslationEntry): Promise<void> {
+    const code = translation.code;
+    const label = translation.label;
+    const cacheDir = join(process.cwd(), 'server', 'data', 'bibles');
+    mkdirSync(cacheDir, { recursive: true });
+    const cachePath = join(cacheDir, `bolls_${code}.json`);
+
+    let parsed: Awaited<ReturnType<typeof fetchBollsTranslation>>;
+    if (existsSync(cachePath)) {
+      this.logger.log(`Loading cached ${label} (${code})…`);
+      parsed = JSON.parse(readFileSync(cachePath, 'utf8').replace(/^\uFEFF/, ''));
+    } else {
+      this.logger.log(`Downloading ${label} from Bolls.life (${code})…`);
+      parsed = await fetchBollsTranslation(code);
+      writeFileSync(cachePath, JSON.stringify(parsed));
+    }
+
+    this.logger.log(`Importing ${label} into SQLite…`);
+    const deleteTranslation = this.database.db.prepare(
+      'DELETE FROM scriptures WHERE translation = ?',
+    );
+    const insert = this.database.db.prepare(
+      `INSERT INTO scriptures (book, chapter, verse, text, translation)
+       VALUES (?, ?, ?, ?, ?)`,
+    );
+
+    const importVerses = this.database.db.transaction(() => {
+      deleteTranslation.run(code);
+      for (const verse of parsed) {
+        insert.run(verse.book, verse.chapter, verse.verse, verse.text, code);
+      }
+    });
+
+    importVerses();
     const count = this.database.db
       .prepare('SELECT COUNT(*) AS count FROM scriptures WHERE translation = ?')
       .get(code) as { count: number };

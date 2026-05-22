@@ -1,4 +1,4 @@
-/** Canonical book order matching thiagobodruk/bible JSON arrays (66 books). */
+/** Canonical book order (Protestant 66-book canon). */
 export const BIBLE_BOOK_NAMES = [
   'Genesis',
   'Exodus',
@@ -80,10 +80,10 @@ export const bookAliases: Record<string, string[]> = {
   Joshua: ['joshua', 'josh'],
   Judges: ['judges', 'judg'],
   Ruth: ['ruth'],
-  '1 Samuel': ['1 samuel', 'first samuel', 'i samuel', 'one samuel'],
-  '2 Samuel': ['2 samuel', 'second samuel', 'ii samuel', 'two samuel'],
-  '1 Kings': ['1 kings', 'first kings', 'i kings', 'one kings'],
-  '2 Kings': ['2 kings', 'second kings', 'ii kings', 'two kings'],
+  '1 Samuel': ['1 samuel', 'first samuel', 'i samuel'],
+  '2 Samuel': ['2 samuel', 'second samuel', 'ii samuel'],
+  '1 Kings': ['1 kings', 'first kings', 'i kings'],
+  '2 Kings': ['2 kings', 'second kings', 'ii kings'],
   '1 Chronicles': ['1 chronicles', 'first chronicles', 'i chronicles'],
   '2 Chronicles': ['2 chronicles', 'second chronicles', 'ii chronicles'],
   Ezra: ['ezra'],
@@ -93,32 +93,32 @@ export const bookAliases: Record<string, string[]> = {
   Psalm: ['psalm', 'psalms', 'ps'],
   Proverbs: ['proverbs', 'prov'],
   Ecclesiastes: ['ecclesiastes', 'eccl'],
-  'Song of Solomon': ['song of solomon', 'song of songs', 'songs'],
+  'Song of Solomon': ['song of solomon', 'song of songs', 'sos'],
   Isaiah: ['isaiah', 'isa'],
   Jeremiah: ['jeremiah', 'jer'],
   Lamentations: ['lamentations', 'lam'],
   Ezekiel: ['ezekiel', 'ezek'],
   Daniel: ['daniel', 'dan'],
-  Hosea: ['hosea', 'hos'],
+  Hosea: ['hosea'],
   Joel: ['joel'],
   Amos: ['amos'],
   Obadiah: ['obadiah', 'obad'],
   Jonah: ['jonah'],
-  Micah: ['micah', 'mic'],
-  Nahum: ['nahum', 'nah'],
+  Micah: ['micah'],
+  Nahum: ['nahum'],
   Habakkuk: ['habakkuk', 'hab'],
   Zephaniah: ['zephaniah', 'zeph'],
-  Haggai: ['haggai', 'hag'],
+  Haggai: ['haggai'],
   Zechariah: ['zechariah', 'zech'],
   Malachi: ['malachi', 'mal'],
-  Matthew: ['matthew', 'matt'],
-  Mark: ['mark'],
-  Luke: ['luke'],
+  Matthew: ['matthew', 'matt', 'mt'],
+  Mark: ['mark', 'mk'],
+  Luke: ['luke', 'lk'],
   John: ['john', 'jn'],
   Acts: ['acts'],
   Romans: ['romans', 'rom'],
-  '1 Corinthians': ['1 corinthians', 'first corinthians', 'one corinthians', 'i corinthians'],
-  '2 Corinthians': ['2 corinthians', 'second corinthians', 'two corinthians', 'ii corinthians'],
+  '1 Corinthians': ['1 corinthians', 'first corinthians', 'i corinthians'],
+  '2 Corinthians': ['2 corinthians', 'second corinthians', 'ii corinthians'],
   Galatians: ['galatians', 'gal'],
   Ephesians: ['ephesians', 'eph'],
   Philippians: ['philippians', 'phil'],
@@ -140,7 +140,7 @@ export const bookAliases: Record<string, string[]> = {
   Revelation: ['revelation', 'rev'],
 };
 
-export type BibleTranslationSource = 'thiagobodruk' | 'helloao';
+export type BibleTranslationSource = 'bolls' | 'thiagobodruk' | 'helloao';
 
 export type BibleTranslationEntry = {
   code: string;
@@ -153,46 +153,55 @@ export type BibleTranslationEntry = {
   priority?: number;
 };
 
-/** English modern translations (HelloAO — free, no API key). */
-export const HELLOAO_ENGLISH_TRANSLATIONS: BibleTranslationEntry[] = [
-  { code: 'BSB', source: 'helloao', helloaoId: 'BSB', label: 'Berean Standard Bible', language: 'English', priority: 1 },
-  { code: 'WEB', source: 'helloao', helloaoId: 'eng_web', label: 'World English Bible', language: 'English', priority: 1 },
-  { code: 'WEBP', source: 'helloao', helloaoId: 'ENGWEBP', label: 'World English Bible (Protestant)', language: 'English', priority: 2 },
-  { code: 'NET', source: 'helloao', helloaoId: 'eng_net', label: 'NET Bible', language: 'English', priority: 1 },
-  { code: 'ASV', source: 'helloao', helloaoId: 'eng_asv', label: 'American Standard Version', language: 'English', priority: 2 },
-  { code: 'FBV', source: 'helloao', helloaoId: 'eng_fbv', label: 'Free Bible Version', language: 'English', priority: 2 },
-  { code: 'PEV', source: 'helloao', helloaoId: 'eng_pev', label: 'Plain English Version', language: 'English', priority: 2 },
-  { code: 'MSB', source: 'helloao', helloaoId: 'eng_msb', label: 'Majority Standard Bible', language: 'English', priority: 3 },
-  { code: 'GNV', source: 'helloao', helloaoId: 'eng_gnv', label: 'Geneva Bible 1599', language: 'English', priority: 3 },
-  { code: 'YLT', source: 'helloao', helloaoId: 'eng_ylt', label: "Young's Literal Translation", language: 'English', priority: 3 },
-  { code: 'DARBY', source: 'helloao', helloaoId: 'eng_dby', label: 'Darby Translation', language: 'English', priority: 3 },
-  { code: 'LSV', source: 'helloao', helloaoId: 'eng_lsv', label: 'Literal Standard Version', language: 'English', priority: 3 },
-  { code: 'ULB', source: 'helloao', helloaoId: 'eng_ulb', label: 'Unlocked Literal Bible', language: 'English', priority: 3 },
-  { code: 'WMB', source: 'helloao', helloaoId: 'eng_wmb', label: 'World Messianic Bible', language: 'English', priority: 3 },
+/** Popular English study/church translations via Bolls.life (free API). */
+export const BOLLS_ENGLISH_TRANSLATIONS: BibleTranslationEntry[] = [
+  { code: 'MSG', source: 'bolls', label: 'The Message', language: 'English', priority: 1 },
+  { code: 'AMP', source: 'bolls', label: 'Amplified Bible', language: 'English', priority: 1 },
+  { code: 'AMPC', source: 'bolls', label: 'Amplified Bible (Classic)', language: 'English', priority: 1 },
+  { code: 'NLT', source: 'bolls', label: 'New Living Translation', language: 'English', priority: 1 },
+  { code: 'NIV', source: 'bolls', label: 'New International Version', language: 'English', priority: 1 },
+  { code: 'ESV', source: 'bolls', label: 'English Standard Version', language: 'English', priority: 1 },
+  { code: 'NKJV', source: 'bolls', label: 'New King James Version', language: 'English', priority: 2 },
+  { code: 'NASB', source: 'bolls', label: 'New American Standard Bible', language: 'English', priority: 2 },
+  { code: 'CSB', source: 'bolls', label: 'Christian Standard Bible', language: 'English', priority: 2 },
+  { code: 'HCSB', source: 'bolls', label: 'Holman Christian Standard Bible', language: 'English', priority: 2 },
+  { code: 'KJV', source: 'bolls', label: 'King James Version', language: 'English', priority: 2 },
+  { code: 'MEV', source: 'bolls', label: 'Modern English Version', language: 'English', priority: 2 },
+  { code: 'LSB', source: 'bolls', label: 'Legacy Standard Bible', language: 'English', priority: 3 },
+  { code: 'NRSV', source: 'bolls', label: 'New Revised Standard Version', language: 'English', priority: 3 },
+  { code: 'RSV', source: 'bolls', label: 'Revised Standard Version', language: 'English', priority: 3 },
+  { code: 'CEV', source: 'bolls', label: 'Contemporary English Version', language: 'English', priority: 3 },
+  { code: 'NCV', source: 'bolls', label: "New Century Version", language: 'English', priority: 3 },
+  { code: 'NIRV', source: 'bolls', label: "New International Reader's Version", language: 'English', priority: 3 },
+  { code: 'GNT', source: 'bolls', label: 'Good News Translation', language: 'English', priority: 3 },
+  { code: 'TLB', source: 'bolls', label: 'The Living Bible', language: 'English', priority: 3 },
+  { code: 'ISV', source: 'bolls', label: 'International Standard Version', language: 'English', priority: 3 },
+  { code: 'PHILLIPS', source: 'bolls', label: 'Phillips New Testament', language: 'English', priority: 4 },
 ];
 
-/** Full catalog: HelloAO English + thiagobodruk multilingual. */
-export const BIBLE_TRANSLATION_CATALOG: BibleTranslationEntry[] = [
-  ...HELLOAO_ENGLISH_TRANSLATIONS,
-  { code: 'KJV', source: 'thiagobodruk', file: 'en_kjv.json', label: 'King James Version', language: 'English', priority: 1 },
-  { code: 'BBE', source: 'thiagobodruk', file: 'en_bbe.json', label: 'Bible in Basic English', language: 'English', priority: 2 },
-  { code: 'RVR', source: 'thiagobodruk', file: 'es_rvr.json', label: 'Reina-Valera', language: 'Spanish' },
-  { code: 'SCHLACHTER', source: 'thiagobodruk', file: 'de_schlachter.json', label: 'Schlachter', language: 'German' },
-  { code: 'GREEK', source: 'thiagobodruk', file: 'el_greek.json', label: 'Modern Greek', language: 'Greek' },
-  { code: 'APEE', source: 'thiagobodruk', file: 'fr_apee.json', label: "La Bible de l'Épée", language: 'French' },
-  { code: 'AA', source: 'thiagobodruk', file: 'pt_aa.json', label: 'Almeida Revisada', language: 'Portuguese' },
-  { code: 'ACF', source: 'thiagobodruk', file: 'pt_acf.json', label: 'Almeida Corrigida Fiel', language: 'Portuguese' },
-  { code: 'NVI', source: 'thiagobodruk', file: 'pt_nvi.json', label: 'Nova Versão Internacional (PT)', language: 'Portuguese' },
-  { code: 'CUV', source: 'thiagobodruk', file: 'zh_cuv.json', label: 'Chinese Union Version', language: 'Chinese' },
-  { code: 'NCV', source: 'thiagobodruk', file: 'zh_ncv.json', label: 'New Chinese Version', language: 'Chinese' },
-  { code: 'KO', source: 'thiagobodruk', file: 'ko_ko.json', label: 'Korean Bible', language: 'Korean' },
-  { code: 'SYNODAL', source: 'thiagobodruk', file: 'ru_synodal.json', label: 'Russian Synodal', language: 'Russian' },
-  { code: 'CORNILESCU', source: 'thiagobodruk', file: 'ro_cornilescu.json', label: 'Cornilescu (Romanian)', language: 'Romanian' },
-  { code: 'VIETNAMESE', source: 'thiagobodruk', file: 'vi_vietnamese.json', label: 'Vietnamese Bible', language: 'Vietnamese' },
-  { code: 'SVD', source: 'thiagobodruk', file: 'ar_svd.json', label: 'Arabic Bible (SVD)', language: 'Arabic' },
-  { code: 'FINNISH', source: 'thiagobodruk', file: 'fi_finnish.json', label: 'Finnish Bible', language: 'Finnish' },
-  { code: 'PR', source: 'thiagobodruk', file: 'fi_pr.json', label: 'Pyhä Raamattu', language: 'Finnish' },
-  { code: 'ESPERANTO', source: 'thiagobodruk', file: 'eo_esperanto.json', label: 'Esperanto', language: 'Esperanto' },
-];
+/** Default set imported on first run / `npm run scripture:seed`. */
+export const DEFAULT_IMPORT_TRANSLATION_CODES = [
+  'MSG',
+  'AMP',
+  'AMPC',
+  'NLT',
+  'NIV',
+  'ESV',
+  'NKJV',
+  'NASB',
+  'CSB',
+  'HCSB',
+  'KJV',
+] as const;
+
+export const BIBLE_TRANSLATION_CATALOG: BibleTranslationEntry[] = [...BOLLS_ENGLISH_TRANSLATIONS];
 
 export const DEFAULT_BIBLE_TRANSLATIONS = BIBLE_TRANSLATION_CATALOG;
+
+export const BOLLS_BOOK_NAME_ALIASES: Record<string, string> = {
+  Psalms: 'Psalm',
+};
+
+export function normalizeBollsBookName(name: string): string {
+  return BOLLS_BOOK_NAME_ALIASES[name] ?? name;
+}
