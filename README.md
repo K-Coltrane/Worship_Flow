@@ -19,6 +19,7 @@ This repo also includes a local-first NestJS backend for the worship presentatio
 - `npm run backend:build` - compile backend TypeScript to `server/dist`
 - `npm run backend:start` - run the compiled backend
 - `npm run backend:test` - run focused backend service tests
+- `npm run desktop:dist:win` - build the Windows desktop installer into `release/`
 
 ### Core API areas
 
@@ -69,8 +70,11 @@ Optional query params:
 Output pages are for **in-room projection**. For YouTube/Facebook, capture the output
 window or use OBS **Browser Source** pointed at the same `/output` URL.
 
-### Future: Electron
+## Windows desktop installer
 
-A desktop build could auto-open one frameless window per monitor. That is not implemented
-yet; browser fullscreen per display is the supported approach today.
-  
+This repo includes an Electron desktop wrapper for the control app. It starts the
+local NestJS backend, serves the compiled Vite frontend, and stores the packaged
+SQLite database under the user's application data directory.
+
+Run `npm run desktop:dist:win` to create a Windows x64 NSIS installer in
+`release/`.
